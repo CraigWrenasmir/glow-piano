@@ -1,4 +1,4 @@
-# Glow Piano
+# Henry's Piano
 
 A piano for the iPad (and any browser) with rising glowing note bars and particle sparks, in the style of piano tutorial videos.
 
