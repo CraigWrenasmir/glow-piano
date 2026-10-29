@@ -18,17 +18,46 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; overscroll-behavior:none; }
   #stage{ position:fixed; inset:0; display:block; touch-action:none; }
-  #bar{ position:fixed; left:0; right:0; top:0; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
-    padding:calc(6px + env(safe-area-inset-top)) 10px 6px; background:var(--bar); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  #bar{ position:fixed; left:0; right:0; top:0; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    padding:calc(6px + env(safe-area-inset-top)) 10px 6px; background:var(--bar); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     transition:transform .25s ease; z-index:5; }
-  #bar.hidden{ transform:translateY(calc(-100% + 0px)); }
+  #bar.hidden{ transform:translateY(-100%); }
   #bar button{ appearance:none; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07); color:var(--fg);
-    border-radius:12px; min-height:44px; padding:0 14px; font-size:15px; font-weight:600; letter-spacing:.2px; cursor:pointer; touch-action:manipulation; }
+    border-radius:12px; min-height:44px; padding:0 14px; font-size:15px; font-weight:600; letter-spacing:.2px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
   #bar button:active{ background:rgba(255,255,255,.2); }
   #bar button.on{ background:rgba(138,209,255,.22); border-color:rgba(138,209,255,.6); }
+  #bar button:disabled{ opacity:.35; }
   #bar button .v{ color:var(--accent); font-weight:700; }
   #bar button .v:empty{ display:none; }
-  #bar button.rec{ background:rgba(255,80,90,.25); border-color:rgba(255,80,90,.8); color:#ffb3b8; }
+  #bar .grp{ display:flex; align-items:center; gap:2px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:14px; padding:3px; }
+  #bar .grp button{ border:0; background:transparent; border-radius:11px; min-height:40px; }
+  #bar .grp button:active{ background:rgba(255,255,255,.18); }
+  #bar .grp button.on{ background:rgba(138,209,255,.22); }
+  #bar .grp .range{ min-width:74px; text-align:center; color:var(--accent); font-weight:700; font-variant-numeric:tabular-nums; }
+  #bar .grp button.big{ font-size:20px; min-width:44px; padding:0 10px; }
+  #bar button.rec{ background:rgba(255,80,90,.3); color:#ffc0c4; }
+  #bar button#recBtn .t{ color:#ff8a92; }
+  #bar button#recBtn.rec .t{ color:#fff; }
+  #bar .title{ font-weight:800; font-size:17px; letter-spacing:.3px; padding:0 6px 0 2px;
+    background:linear-gradient(90deg,#ff6b6b,#ffd166,#06d6a0,#4cc9f0,#c77dff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #bar .sp{ flex:1; }
+  #bar .icon{ min-width:44px; padding:0 12px; }
+  @media (max-width:980px){ #bar .title{ display:none; } #bar .lbl{ display:none; } #bar .icon{ padding:0 10px; } }
+  #settings{ position:fixed; right:10px; top:70px; z-index:6; width:min(700px, calc(100vw - 20px)); max-height:calc(100vh - 90px); overflow:auto;
+    background:rgba(16,16,30,.96); border:1px solid rgba(255,255,255,.14); border-radius:18px; padding:6px 18px 12px; display:none;
+    box-shadow:0 20px 60px rgba(0,0,0,.6); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  #settings.show{ display:block; }
+  #settings .row{ display:grid; grid-template-columns:92px 1fr; gap:8px 10px; align-items:start; padding:12px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+  #settings .row:last-child{ border-bottom:0; }
+  #settings .lab{ color:var(--muted); font-weight:700; font-size:14px; letter-spacing:.3px; text-transform:uppercase; padding-top:11px; }
+  #settings .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ appearance:none; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:var(--fg); border-radius:999px;
+    min-height:40px; padding:0 14px; font-size:15px; font-weight:600; display:inline-flex; align-items:center; gap:8px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
+  .chip:active{ background:rgba(255,255,255,.2); }
+  .chip.on{ background:rgba(138,209,255,.2); border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .chip .sw{ width:20px; height:20px; border-radius:50%; background:var(--sw); box-shadow:0 0 0 1px rgba(0,0,0,.4) inset; }
+  .chip .ic{ font-size:17px; }
+  @media (max-width:600px){ #settings .row{ grid-template-columns:1fr; } #settings .lab{ padding-top:0; } }
   #list .row{ display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.08); }
   #list .row .name{ flex:1; font-size:16px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
   #list .row .len{ color:var(--muted); font-size:14px; }
@@ -37,12 +66,6 @@
   #list .row button.del.sure{ background:#b8303c; color:#fff; }
   #list .empty{ color:var(--muted); }
   #bar .sp{ flex:1; }
-  #bar .sel{ position:relative; display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07);
-    border-radius:12px; min-height:44px; padding:0 30px 0 14px; font-size:15px; font-weight:600; color:var(--fg); }
-  #bar .sel::after{ content:"▾"; position:absolute; right:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
-  #bar .sel select{ appearance:none; -webkit-appearance:none; border:0; background:transparent; color:var(--accent); font:inherit; font-weight:700;
-    padding:10px 0; margin:0; max-width:150px; outline:none; cursor:pointer; }
-  #bar .sel select option{ color:#111; background:#fff; }
   #renderBox{ position:fixed; left:50%; bottom:calc(27% + 16px); transform:translateX(-50%); z-index:7; display:none; align-items:center; gap:12px;
     background:rgba(20,20,36,.92); border:1px solid rgba(255,255,255,.15); border-radius:14px; padding:10px 14px; font-size:15px; }
   #renderBox.show{ display:flex; }
@@ -53,7 +76,6 @@
     -webkit-user-select:text; user-select:text; margin:6px 0 16px; }
   .overlay .btns{ display:flex; gap:10px; flex-wrap:wrap; }
   .overlay button.ghost{ background:rgba(255,255,255,.12); color:var(--fg); }
-  #bar .title{ font-weight:800; font-size:16px; letter-spacing:.3px; padding-right:4px; }
   #tab{ position:fixed; top:0; left:50%; transform:translateX(-50%); z-index:6; border:0; border-radius:0 0 12px 12px;
     background:rgba(255,255,255,.1); color:var(--fg); min-height:30px; padding:calc(env(safe-area-inset-top)) 18px 4px; font-size:14px;
     cursor:pointer; touch-action:manipulation; display:none; }
@@ -78,23 +100,29 @@
 
 <div id="bar">
   <span class="title">Henry's Piano</span>
-  <button id="octDown" title="Octave down">Octave −</button>
-  <button id="octUp" title="Octave up">Octave +</button>
-  <label class="sel">Keys<select id="keysSel"></select></label>
-  <label class="sel">Colours<select id="themeSel"></select></label>
-  <label class="sel">Sound<select id="voiceSel"></select></label>
-  <label class="sel">Effect<select id="fxSel"></select></label>
-  <label class="sel">Sparkle<select id="sparkSel"></select></label>
-  <button id="sustainBtn">Sustain</button>
-  <button id="labelsBtn">Letters</button>
-  <button id="tuneBtn">♪ Play a tune</button>
-  <button id="recBtn"><span class="t">● Record</span> <span class="v" id="recTime"></span></button>
-  <button id="playBtn" style="display:none">▶ Play back</button>
-  <button id="listBtn" style="display:none">My recordings <span class="v"></span></button>
+  <div class="grp" title="Octave">
+    <button id="octDown" class="big" title="Octave down">−</button>
+    <span class="range" id="rangeLbl">C3–C5</span>
+    <button id="octUp" class="big" title="Octave up">+</button>
+  </div>
+  <div class="grp">
+    <button id="tuneBtn">♪ Tune</button>
+    <button id="recBtn"><span class="t">● Record</span> <span class="v" id="recTime"></span></button>
+    <button id="playBtn" style="display:none">▶ Play back</button>
+    <button id="listBtn" style="display:none">🎞 <span class="v"></span></button>
+  </div>
   <span class="sp"></span>
-  <button id="helpBtn">?</button>
-  <button id="fsBtn">⤢ Full screen</button>
-  <button id="hideBtn" title="Hide toolbar">▲</button>
+  <button id="setBtn" class="icon">⚙ <span class="lbl">Settings</span></button>
+  <button id="fsBtn" class="icon">⤢ <span class="lbl">Full screen</span></button>
+  <button id="hideBtn" class="icon" title="Hide toolbar">▲</button>
+</div>
+<div id="settings">
+  <div class="row"><div class="lab">Keys</div><div class="chips" id="keysChips"></div></div>
+  <div class="row"><div class="lab">Colours</div><div class="chips" id="themeChips"></div></div>
+  <div class="row"><div class="lab">Effect</div><div class="chips" id="fxChips"></div></div>
+  <div class="row"><div class="lab">Sparkle</div><div class="chips" id="sparkChips"></div></div>
+  <div class="row"><div class="lab">Sound</div><div class="chips" id="voiceChips"></div></div>
+  <div class="row"><div class="lab">Options</div><div class="chips"><button class="chip" id="sustainBtn">Sustain</button><button class="chip" id="labelsBtn">Letters on keys</button><button class="chip" id="helpBtn">? How to play</button></div></div>
 </div>
 <button id="tab">▼ menu</button>
 
@@ -109,16 +137,14 @@
     <h2>How to play</h2>
     <p>Tap the keys at the bottom. Hold a key to grow a long note. Slide your finger across the keys for a glissando. Use lots of fingers at once.</p>
     <ul>
-      <li><b>Octave − / +</b> moves the whole keyboard lower or higher.</li>
-      <li><b>Keys</b> switches between one, two, three and four octaves.</li>
-      <li><b>Colours</b> changes the glow. <i>Notes</i> gives every note name its own colour.</li>
-      <li><b>Sound</b> picks the instrument. <b>Sustain</b> lets notes ring on after you let go.</li>
-      <li><b>Effect</b> picks the particle style and <b>Sparkle</b> sets how many fly. <b>Letters</b> shows note names on the keys.</li>
-      <li><b>🎬</b> in My recordings turns a recording into a video with sound. It replays in real time, so keep the screen open, then tap <b>Save video</b> to save it to Photos or Files.</li>
-      <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>My recordings</b> keeps them all. Tap a name to rename it.</li>
+      <li><b>− / +</b> moves the whole keyboard an octave lower or higher.</li>
+      <li><b>⚙ Settings</b> has everything else: how many octaves, the colours, the particle effect and how much sparkle, the instrument sound, sustain and the letters on the keys.</li>
+      <li><b>♪ Tune</b> plays a built-in tune with the notes falling onto the keys. Tap again for the next tune.</li>
+      <li><b>🎬</b> in the 🎞 recordings list turns a recording into a video with sound. It replays in real time, so keep the screen open, then tap <b>Save video</b> to save it to Photos or Files.</li>
+      <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>🎞</b> lists them all. Tap a name to rename it.</li>
       <li><b>▲</b> hides the toolbar so the whole screen is piano. Tap <b>▼ menu</b> to bring it back.</li>
     </ul>
-    <p><b>Full screen:</b> tap <b>⤢ Full screen</b> in the toolbar. For the best version on an iPad, in Safari tap the Share button, then <b>Add to Home Screen</b>. It then opens full screen like an app every time, with its own icon.</p>
+    <p><b>Full screen:</b> tap <b>⤢</b> in the toolbar. For the best version on an iPad, in Safari tap the Share button, then <b>Add to Home Screen</b>. It then opens full screen like an app every time, with its own icon.</p>
     <p><b>On a computer keyboard:</b> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> are white keys, <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> <kbd>O</kbd> <kbd>P</kbd> are black keys, <kbd>Z</kbd> / <kbd>X</kbd> change octave.</p>
     <button id="helpClose">Got it</button>
   </div>
@@ -190,10 +216,10 @@ function layout() {
     k.col = colourFor(k);
   }
 }
-function colourFor(k) {
-  const N = keys.length, t = k.i / Math.max(1, N - 1);
+function colourFor(k, theme = state.theme, N = keys.length) {
+  const t = k.i / Math.max(1, N - 1);
   let h, s = 85, l = k.black ? 52 : 62;
-  switch (state.theme) {
+  switch (theme) {
     case 'Rainbow': h = 360 * t * 0.92; break;
     case 'Notes': h = k.pc * 30; break;
     case 'Ocean': h = 165 + 75 * t; s = 80; break;
@@ -520,16 +546,43 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if (inField(e)) return; const key = e.key.toLowerCase(); if (key in KEYMAP) { const k = keys[KEYMAP[key]]; if (k) release(k, 'k' + key); } });
 
 // ---------- toolbar ----------
-function fill(sel, items, labels) { sel.innerHTML = ''; items.forEach((v, i) => { const o = document.createElement('option'); o.value = v; o.textContent = labels ? labels[i] : v; sel.appendChild(o); }); }
-fill($('keysSel'), KEYCOUNTS, ['1 octave', '2 octaves', '3 octaves', '4 octaves']);
-fill($('themeSel'), THEMES); fill($('voiceSel'), VOICES); fill($('fxSel'), FX); fill($('sparkSel'), [0, 1, 2], SPARK);
+function chips(box, items, opts) {
+  box.innerHTML = '';
+  items.forEach(v => {
+    const c = document.createElement('button'); c.className = 'chip'; c.dataset.v = v;
+    if (opts.swatch) { const sw = document.createElement('span'); sw.className = 'sw'; sw.style.setProperty('--sw', opts.swatch(v)); c.appendChild(sw); }
+    if (opts.icon) { const ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = opts.icon[v]; c.appendChild(ic); }
+    c.appendChild(document.createTextNode(opts.label ? opts.label(v) : v));
+    c.onclick = () => opts.pick(v);
+    box.appendChild(c);
+  });
+}
+function mark(box, value) { for (const c of box.children) c.classList.toggle('on', c.dataset.v == value); }
+function themeSwatch(name) {
+  const pcs = [0, 2, 4, 5, 7, 9, 11, 12];
+  const cols = pcs.map((pc, i) => hsl(colourFor({ i, pc: pc % 12, black: false }, name, pcs.length)));
+  return `linear-gradient(90deg, ${cols.join(',')})`;
+}
+const FX_ICON = { Sparks: '✦', Fountain: '⛲', Fireworks: '🎆', Bubbles: '🫧', Confetti: '🎊', Stars: '⭐' };
+const VOICE_ICON = { Piano: '🎹', Soft: '🌙', Bells: '🔔', 'Music Box': '🎁', Organ: '🎺', Retro: '👾' };
+const NOTE_NAME = n => NAMES[n % 12] + (Math.floor(n / 12) - 1);
+chips($('keysChips'), KEYCOUNTS, { label: v => (v - 1) / 12 + (v === 13 ? ' octave' : ' octaves'), pick: v => { releaseAll(); state.count = v; if (state.low + state.count > 108) state.low = 108 - state.count; state.low = Math.floor(state.low / 12) * 12; layout(); refreshUI(); } });
+chips($('themeChips'), THEMES, { swatch: themeSwatch, pick: v => { state.theme = v; glowSprites = {}; layout(); refreshUI(); } });
+chips($('fxChips'), FX, { icon: FX_ICON, pick: v => { state.fx = v; refreshUI(); } });
+chips($('sparkChips'), [0, 1, 2], { label: v => SPARK[v], pick: v => { state.spark = v; refreshUI(); } });
+chips($('voiceChips'), VOICES, { icon: VOICE_ICON, pick: v => { state.voice = v; refreshUI(); } });
 function refreshUI() {
-  $('keysSel').value = state.count; $('themeSel').value = state.theme; $('voiceSel').value = state.voice; $('fxSel').value = state.fx; $('sparkSel').value = state.spark;
+  mark($('keysChips'), state.count); mark($('themeChips'), state.theme); mark($('fxChips'), state.fx); mark($('sparkChips'), state.spark); mark($('voiceChips'), state.voice);
   $('sustainBtn').classList.toggle('on', state.sustain);
   $('labelsBtn').classList.toggle('on', state.labels);
   $('octDown').disabled = state.low <= 24; $('octUp').disabled = state.low + state.count > 96;
+  $('rangeLbl').textContent = NOTE_NAME(state.low) + '–' + NOTE_NAME(state.low + state.count - 1);
   save();
 }
+function placeSettings() { $('settings').style.top = ($('bar').offsetHeight + 6) + 'px'; }
+function toggleSettings(show) { const on = show == null ? !$('settings').classList.contains('show') : show; placeSettings(); $('settings').classList.toggle('show', on); $('setBtn').classList.toggle('on', on); }
+$('setBtn').onclick = () => toggleSettings();
+document.addEventListener('pointerdown', e => { if ($('settings').classList.contains('show') && !$('settings').contains(e.target) && !$('setBtn').contains(e.target)) toggleSettings(false); }, true);
 function shiftOctave(d) {
   const nl = state.low + 12 * d; if (nl < 24 || nl + state.count > 108) return;
   releaseAll(); state.low = nl; layout(); refreshUI();
@@ -537,23 +590,18 @@ function shiftOctave(d) {
 function toggleSustain() { state.sustain = !state.sustain; if (!state.sustain && ac) releaseSustained(); refreshUI(); }
 $('octDown').onclick = () => shiftOctave(-1);
 $('octUp').onclick = () => shiftOctave(1);
-$('keysSel').onchange = e => { releaseAll(); state.count = +e.target.value; if (state.low + state.count > 108) state.low = 108 - state.count; state.low = Math.floor(state.low / 12) * 12; layout(); refreshUI(); };
-$('themeSel').onchange = e => { state.theme = e.target.value; glowSprites = {}; layout(); refreshUI(); };
-$('voiceSel').onchange = e => { state.voice = e.target.value; refreshUI(); };
-$('fxSel').onchange = e => { state.fx = e.target.value; refreshUI(); };
-$('sparkSel').onchange = e => { state.spark = +e.target.value; refreshUI(); };
 $('sustainBtn').onclick = toggleSustain;
 $('labelsBtn').onclick = () => { state.labels = !state.labels; refreshUI(); };
-$('hideBtn').onclick = () => { $('bar').classList.add('hidden'); $('tab').classList.add('show'); };
+$('hideBtn').onclick = () => { toggleSettings(false); $('bar').classList.add('hidden'); $('tab').classList.add('show'); };
 $('tab').onclick = () => { $('bar').classList.remove('hidden'); $('tab').classList.remove('show'); };
-$('helpBtn').onclick = () => $('help').classList.add('show');
+$('helpBtn').onclick = () => { toggleSettings(false); $('help').classList.add('show'); };
 $('helpClose').onclick = () => $('help').classList.remove('show');
 $('help').addEventListener('click', e => { if (e.target === $('help')) $('help').classList.remove('show'); });
 const standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
 const fsEl = document.documentElement;
 const fsOK = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) && (document.fullscreenEnabled !== false);
 const inFS = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
-function setFSLabel() { $('fsBtn').textContent = inFS() ? '⤡ Exit full screen' : '⤢ Full screen'; }
+function setFSLabel() { $('fsBtn').innerHTML = inFS() ? '⤡ <span class="lbl">Exit</span>' : '⤢ <span class="lbl">Full screen</span>'; }
 if (standalone) $('fsBtn').style.display = 'none';
 else $('fsBtn').onclick = () => {
   if (!fsOK) { alert('Full screen is not available in this browser. Tap Share, then Add to Home Screen, and open it from there to get the full screen version.'); return; }
@@ -604,6 +652,7 @@ function startTune() {
 }
 function demoTick(t) {
   if (rec) { const f = fmt(t - rec.start); if (f !== rec.shown) { rec.shown = f; $('recTime').textContent = f; } if (t - rec.start > 300) stopRecording(); }
+  if ($('settings').classList.contains('show')) placeSettings();
   if (!demo) return;
   const el = t - demo.start;
   for (const e of demo.ev) {
@@ -622,7 +671,7 @@ function startRecording() {
   ensureAudio(); firstTouch();
   rec = { start: now(), events: [], voice: state.voice };
   if (demo && !demo.forRender) stopPlayback();
-  $('recBtn').classList.add('rec'); $('recBtn').querySelector('.t').textContent = '■ Stop'; $('recTime').textContent = '0:00';
+  $('recBtn').classList.add('rec'); $('recBtn').querySelector('.t').textContent = '■ Stop'; $('recTime').textContent = '0:00'; toggleSettings(false);
 }
 function stopRecording() {
   if (!rec) return;
