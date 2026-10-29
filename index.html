@@ -93,7 +93,7 @@
   <button id="listBtn" style="display:none">My recordings <span class="v"></span></button>
   <span class="sp"></span>
   <button id="helpBtn">?</button>
-  <button id="fsBtn" style="display:none">⤢</button>
+  <button id="fsBtn">⤢ Full screen</button>
   <button id="hideBtn" title="Hide toolbar">▲</button>
 </div>
 <button id="tab">▼ menu</button>
@@ -118,7 +118,7 @@
       <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>My recordings</b> keeps them all. Tap a name to rename it.</li>
       <li><b>▲</b> hides the toolbar so the whole screen is piano. Tap <b>▼ menu</b> to bring it back.</li>
     </ul>
-    <p><b>On an iPad:</b> in Safari tap the Share button, then <b>Add to Home Screen</b>. It then opens full screen like an app.</p>
+    <p><b>Full screen:</b> tap <b>⤢ Full screen</b> in the toolbar. For the best version on an iPad, in Safari tap the Share button, then <b>Add to Home Screen</b>. It then opens full screen like an app every time, with its own icon.</p>
     <p><b>On a computer keyboard:</b> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> are white keys, <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> <kbd>O</kbd> <kbd>P</kbd> are black keys, <kbd>Z</kbd> / <kbd>X</kbd> change octave.</p>
     <button id="helpClose">Got it</button>
   </div>
@@ -549,12 +549,21 @@ $('tab').onclick = () => { $('bar').classList.remove('hidden'); $('tab').classLi
 $('helpBtn').onclick = () => $('help').classList.add('show');
 $('helpClose').onclick = () => $('help').classList.remove('show');
 $('help').addEventListener('click', e => { if (e.target === $('help')) $('help').classList.remove('show'); });
-const fsOK = document.fullscreenEnabled || document.webkitFullscreenEnabled;
-if (fsOK) { $('fsBtn').style.display = ''; $('fsBtn').onclick = () => {
-  const el = document.documentElement;
-  if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-  else (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
-}; }
+const standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+const fsEl = document.documentElement;
+const fsOK = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) && (document.fullscreenEnabled !== false);
+const inFS = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function setFSLabel() { $('fsBtn').textContent = inFS() ? '⤡ Exit full screen' : '⤢ Full screen'; }
+if (standalone) $('fsBtn').style.display = 'none';
+else $('fsBtn').onclick = () => {
+  if (!fsOK) { alert('Full screen is not available in this browser. Tap Share, then Add to Home Screen, and open it from there to get the full screen version.'); return; }
+  try {
+    if (inFS()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else { const r = (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl); if (r && r.catch) r.catch(() => {}); }
+  } catch (e) {}
+};
+document.addEventListener('fullscreenchange', () => { setFSLabel(); setTimeout(resize, 150); });
+document.addEventListener('webkitfullscreenchange', () => { setFSLabel(); setTimeout(resize, 150); });
 
 // ---------- demo tunes ----------
 const TUNES = [
