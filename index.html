@@ -27,6 +27,7 @@
   #bar button:active{ background:rgba(255,255,255,.2); }
   #bar button.on{ background:rgba(138,209,255,.22); border-color:rgba(138,209,255,.6); }
   #bar button .v{ color:var(--accent); font-weight:700; }
+  #bar button .v:empty{ display:none; }
   #bar button.rec{ background:rgba(255,80,90,.25); border-color:rgba(255,80,90,.8); color:#ffb3b8; }
   #list .row{ display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.08); }
   #list .row .name{ flex:1; font-size:16px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
@@ -70,7 +71,7 @@
   <button id="labelsBtn">Letters</button>
   <button id="sparkBtn">Sparkle <span class="v"></span></button>
   <button id="tuneBtn">♪ Play a tune</button>
-  <button id="recBtn">● Record</button>
+  <button id="recBtn"><span class="t">● Record</span> <span class="v" id="recTime"></span></button>
   <button id="playBtn" style="display:none">▶ Play back</button>
   <button id="listBtn" style="display:none">My recordings <span class="v"></span></button>
   <span class="sp"></span>
@@ -513,7 +514,7 @@ function startTune() {
   startPlayback(ev, t, $('tuneBtn'), tune.name);
 }
 function demoTick(t) {
-  if (rec) { $('recBtn').textContent = '■ Stop ' + fmt(t - rec.start); if (t - rec.start > 300) stopRecording(); }
+  if (rec) { const f = fmt(t - rec.start); if (f !== rec.shown) { rec.shown = f; $('recTime').textContent = f; } if (t - rec.start > 300) stopRecording(); }
   if (!demo) return;
   const el = t - demo.start;
   for (const e of demo.ev) {
@@ -531,12 +532,12 @@ function saveRecs() { try { localStorage.setItem('glowPianoRecs', JSON.stringify
 function startRecording() {
   ensureAudio(); firstTouch();
   rec = { start: now(), events: [], voice: state.voice };
-  $('recBtn').classList.add('rec'); $('recBtn').textContent = '■ Stop 0:00';
+  $('recBtn').classList.add('rec'); $('recBtn').querySelector('.t').textContent = '■ Stop'; $('recTime').textContent = '0:00';
 }
 function stopRecording() {
   if (!rec) return;
   const r = rec; rec = null;
-  $('recBtn').classList.remove('rec'); $('recBtn').textContent = '● Record';
+  $('recBtn').classList.remove('rec'); $('recBtn').querySelector('.t').textContent = '● Record'; $('recTime').textContent = '';
   for (const k of keys) if (k.held) r.events.push([+(now() - r.start).toFixed(3), k.n, 0]);
   if (!r.events.length) return;
   const n = recordings.reduce((m, x) => Math.max(m, x.num || 0), 0) + 1;
@@ -584,7 +585,7 @@ $('list').innerHTML = '<div class="card"><h2>My recordings</h2><div class="rows"
 $('listClose').onclick = () => $('list').classList.remove('show');
 $('list').addEventListener('click', e => { if (e.target === $('list')) $('list').classList.remove('show'); });
 $('listBtn').onclick = () => { refreshRecUI(); $('list').classList.add('show'); };
-$('recBtn').onclick = () => rec ? stopRecording() : startRecording();
+$('recBtn').addEventListener('pointerdown', e => { e.preventDefault(); rec ? stopRecording() : startRecording(); });
 $('playBtn').onclick = () => demo && demo.btn === $('playBtn') ? stopPlayback() : (recordings.length && playRecording(recordings[recordings.length - 1]));
 refreshRecUI();
 $('tuneBtn').onclick = () => demo && demo.btn === $('tuneBtn') ? stopPlayback() : startTune();
