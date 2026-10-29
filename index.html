@@ -37,6 +37,22 @@
   #list .row button.del.sure{ background:#b8303c; color:#fff; }
   #list .empty{ color:var(--muted); }
   #bar .sp{ flex:1; }
+  #bar .sel{ position:relative; display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.07);
+    border-radius:12px; min-height:44px; padding:0 30px 0 14px; font-size:15px; font-weight:600; color:var(--fg); }
+  #bar .sel::after{ content:"▾"; position:absolute; right:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+  #bar .sel select{ appearance:none; -webkit-appearance:none; border:0; background:transparent; color:var(--accent); font:inherit; font-weight:700;
+    padding:10px 0; margin:0; max-width:150px; outline:none; cursor:pointer; }
+  #bar .sel select option{ color:#111; background:#fff; }
+  #renderBox{ position:fixed; left:50%; bottom:calc(27% + 16px); transform:translateX(-50%); z-index:7; display:none; align-items:center; gap:12px;
+    background:rgba(20,20,36,.92); border:1px solid rgba(255,255,255,.15); border-radius:14px; padding:10px 14px; font-size:15px; }
+  #renderBox.show{ display:flex; }
+  #renderBox .dot{ width:10px; height:10px; border-radius:50%; background:#ff5a64; animation:blink 1s infinite; }
+  @keyframes blink{ 50%{ opacity:.2; } }
+  #renderBox button{ appearance:none; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.1); color:var(--fg); border-radius:10px; min-height:40px; padding:0 14px; font-weight:600; }
+  .overlay input{ width:100%; font-size:20px; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.2); background:#0d0d18; color:var(--fg);
+    -webkit-user-select:text; user-select:text; margin:6px 0 16px; }
+  .overlay .btns{ display:flex; gap:10px; flex-wrap:wrap; }
+  .overlay button.ghost{ background:rgba(255,255,255,.12); color:var(--fg); }
   #bar .title{ font-weight:800; font-size:16px; letter-spacing:.3px; padding-right:4px; }
   #tab{ position:fixed; top:0; left:50%; transform:translateX(-50%); z-index:6; border:0; border-radius:0 0 12px 12px;
     background:rgba(255,255,255,.1); color:var(--fg); min-height:30px; padding:calc(env(safe-area-inset-top)) 18px 4px; font-size:14px;
@@ -64,12 +80,13 @@
   <span class="title">Glow Piano</span>
   <button id="octDown" title="Octave down">Octave −</button>
   <button id="octUp" title="Octave up">Octave +</button>
-  <button id="keysBtn">Keys <span class="v"></span></button>
-  <button id="themeBtn">Colours <span class="v"></span></button>
-  <button id="voiceBtn">Sound <span class="v"></span></button>
+  <label class="sel">Keys<select id="keysSel"></select></label>
+  <label class="sel">Colours<select id="themeSel"></select></label>
+  <label class="sel">Sound<select id="voiceSel"></select></label>
+  <label class="sel">Effect<select id="fxSel"></select></label>
+  <label class="sel">Sparkle<select id="sparkSel"></select></label>
   <button id="sustainBtn">Sustain</button>
   <button id="labelsBtn">Letters</button>
-  <button id="sparkBtn">Sparkle <span class="v"></span></button>
   <button id="tuneBtn">♪ Play a tune</button>
   <button id="recBtn"><span class="t">● Record</span> <span class="v" id="recTime"></span></button>
   <button id="playBtn" style="display:none">▶ Play back</button>
@@ -84,16 +101,20 @@
 <div id="hint"><h1>Glow Piano</h1><p>Tap the keys to play</p></div>
 
 <div id="list" class="overlay"></div>
+<div id="name" class="overlay"><div class="card"><h2 id="nameTitle">Name your recording</h2><input id="nameInput" maxlength="40" autocomplete="off" autocorrect="off" enterkeyhint="done"><div class="btns"><button id="nameSave">Save</button><button id="nameCancel" class="ghost">Cancel</button></div></div></div>
+<div id="video" class="overlay"><div class="card"><h2>Video ready</h2><p id="videoInfo"></p><div class="btns"><button id="videoSave">Save video</button><button id="videoClose" class="ghost">Close</button></div></div></div>
+<div id="renderBox"><span class="dot"></span><span id="renderText">Making video… keep this screen open</span><button id="renderCancel">Cancel</button></div>
 <div id="help" class="overlay">
   <div class="card">
     <h2>How to play</h2>
     <p>Tap the keys at the bottom. Hold a key to grow a long note. Slide your finger across the keys for a glissando. Use lots of fingers at once.</p>
     <ul>
       <li><b>Octave − / +</b> moves the whole keyboard lower or higher.</li>
-      <li><b>Keys</b> switches between one, two and three octaves.</li>
+      <li><b>Keys</b> switches between one, two, three and four octaves.</li>
       <li><b>Colours</b> changes the glow. <i>Notes</i> gives every note name its own colour.</li>
       <li><b>Sound</b> picks the instrument. <b>Sustain</b> lets notes ring on after you let go.</li>
-      <li><b>Letters</b> shows note names on the keys. <b>Sparkle</b> sets how many particles fly.</li>
+      <li><b>Effect</b> picks the particle style and <b>Sparkle</b> sets how many fly. <b>Letters</b> shows note names on the keys.</li>
+      <li><b>🎬</b> in My recordings turns a recording into a video with sound. It replays in real time, so keep the screen open, then tap <b>Save video</b> to save it to Photos or Files.</li>
       <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>My recordings</b> keeps them all. Tap a name to rename it.</li>
       <li><b>▲</b> hides the toolbar so the whole screen is piano. Tap <b>▼ menu</b> to bring it back.</li>
     </ul>
@@ -111,12 +132,19 @@ const ctx = canvas.getContext('2d', { alpha: false });
 const $ = id => document.getElementById(id);
 
 // ---------- settings ----------
-const THEMES = ['Rainbow', 'Notes', 'Ocean', 'Sunset', 'Classic'];
-const VOICES = ['Piano', 'Soft', 'Bells', 'Retro'];
+const THEMES = ['Rainbow', 'Notes', 'Ocean', 'Sunset', 'Candy', 'Neon', 'Forest', 'Ice', 'Fire', 'Classic'];
+const VOICES = ['Piano', 'Soft', 'Bells', 'Music Box', 'Organ', 'Retro'];
+const FX = ['Sparks', 'Fountain', 'Fireworks', 'Bubbles', 'Confetti', 'Stars'];
 const SPARK = ['Off', 'Some', 'Lots'];
-const KEYCOUNTS = [13, 25, 37];
-const state = { low: 48, count: 25, theme: 0, voice: 0, sustain: false, labels: true, spark: 1 };
+const KEYCOUNTS = [13, 25, 37, 49];
+const OLD_THEMES = ['Rainbow', 'Notes', 'Ocean', 'Sunset', 'Classic'], OLD_VOICES = ['Piano', 'Soft', 'Bells', 'Retro'];
+const state = { low: 48, count: 25, theme: 'Rainbow', voice: 'Piano', fx: 'Sparks', sustain: false, labels: true, spark: 1 };
 try { Object.assign(state, JSON.parse(localStorage.getItem('glowPiano') || '{}')); } catch (e) {}
+if (typeof state.theme === 'number') state.theme = OLD_THEMES[state.theme] || 'Rainbow';
+if (typeof state.voice === 'number') state.voice = OLD_VOICES[state.voice] || 'Piano';
+if (!THEMES.includes(state.theme)) state.theme = 'Rainbow';
+if (!VOICES.includes(state.voice)) state.voice = 'Piano';
+if (!FX.includes(state.fx)) state.fx = 'Sparks';
 state.low = Math.round(state.low / 12) * 12;
 if (!KEYCOUNTS.includes(state.count)) state.count = 25;
 function save() { try { localStorage.setItem('glowPiano', JSON.stringify(state)); } catch (e) {} }
@@ -165,11 +193,16 @@ function layout() {
 function colourFor(k) {
   const N = keys.length, t = k.i / Math.max(1, N - 1);
   let h, s = 85, l = k.black ? 52 : 62;
-  switch (THEMES[state.theme]) {
+  switch (state.theme) {
     case 'Rainbow': h = 360 * t * 0.92; break;
     case 'Notes': h = k.pc * 30; break;
     case 'Ocean': h = 165 + 75 * t; s = 80; break;
     case 'Sunset': h = 320 + 100 * t; s = 90; break;
+    case 'Candy': h = 360 * t; s = 70; l = k.black ? 64 : 76; break;
+    case 'Neon': h = 200 + 360 * t; s = 100; l = k.black ? 50 : 58; break;
+    case 'Forest': h = 70 + 95 * t; s = 70; l = k.black ? 45 : 56; break;
+    case 'Ice': h = 185 + 60 * t; s = 75; l = k.black ? 62 : 74; break;
+    case 'Fire': h = 55 * t; s = 95; l = k.black ? 50 : 58; break;
     default: h = k.black ? 212 : 132; s = k.black ? 90 : 70; l = k.black ? 60 : 55;
   }
   return { h: ((h % 360) + 360) % 360, s, l };
@@ -177,7 +210,7 @@ function colourFor(k) {
 const hsl = (c, l, a = 1) => `hsla(${c.h},${c.s}%,${l == null ? c.l : l}%,${a})`;
 
 // ---------- audio ----------
-let ac = null, master, convolver, wet, noiseBuf;
+let ac = null, master, convolver, wet, noiseBuf, finalNode, audioDest = null;
 function ensureAudio() {
   if (!ac) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -185,7 +218,7 @@ function ensureAudio() {
     master = ac.createGain(); master.gain.value = 0.7;
     const comp = ac.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
-    master.connect(comp); comp.connect(ac.destination);
+    master.connect(comp); comp.connect(ac.destination); finalNode = comp;
     convolver = ac.createConvolver(); convolver.buffer = impulse(2.4, 2.8);
     wet = ac.createGain(); wet.gain.value = 0.28;
     master.connect(convolver); convolver.connect(wet); wet.connect(comp);
@@ -207,13 +240,17 @@ const VOICE_DEFS = {
     partials: [[1, 1, 'sine', 2.6], [2, 0.3, 'sine', 1.4], [3, 0.08, 'sine', 0.9], [1, 0.4, 'sine', 2.6, -6]] },
   Bells: { attack: 0.004, release: 0.5, filt: [12, 6, 1.2], hammer: 0.08,
     partials: [[1, 0.8, 'sine', 2.2], [2.76, 0.5, 'sine', 1.3], [5.4, 0.3, 'sine', 0.7], [8.93, 0.12, 'sine', 0.35], [0.5, 0.25, 'sine', 2.8]] },
+  'Music Box': { attack: 0.003, release: 0.3, filt: [14, 8, 1], hammer: 0.05,
+    partials: [[1, 0.7, 'sine', 1.2], [4, 0.35, 'sine', 0.5], [6.1, 0.15, 'sine', 0.3], [2, 0.2, 'triangle', 0.8]] },
+  Organ: { attack: 0.02, release: 0.15, filt: [8, 6, 0.3], hammer: 0, sustainHold: true,
+    partials: [[1, 0.5, 'sine', 20], [2, 0.3, 'sine', 20], [3, 0.15, 'sine', 20], [4, 0.12, 'sine', 20], [0.5, 0.2, 'sine', 20], [6, 0.05, 'sine', 20]] },
   Retro: { attack: 0.005, release: 0.08, filt: [5, 3, 1.5], hammer: 0, sustainHold: true,
     partials: [[1, 0.55, 'square', 20], [1, 0.3, 'sawtooth', 20, 7], [2, 0.12, 'square', 20]] },
 };
 const voices = new Map(); // key index -> voice
 function noteOn(k) {
   ensureAudio();
-  const def = VOICE_DEFS[VOICES[state.voice]];
+  const def = VOICE_DEFS[state.voice];
   const f = 440 * Math.pow(2, (k.n - 69) / 12);
   const now = ac.currentTime;
   const vel = 0.85 + Math.random() * 0.15;
@@ -255,7 +292,7 @@ function killVoice(v, rel) {
 }
 function noteOff(k) {
   const v = voices.get(k.i); if (!v) return;
-  const def = VOICE_DEFS[VOICES[state.voice]];
+  const def = VOICE_DEFS[state.voice];
   if (state.sustain) { if (def.sustainHold) killVoice(v, 1.2); return; }
   killVoice(v, def.release);
 }
@@ -265,13 +302,28 @@ function releaseSustained() { for (const v of voices.values()) killVoice(v, 0.5)
 const bars = [], parts = [];
 const now = () => performance.now() / 1000;
 let glowSprites = {};
-function sprite(c) {
-  const key = Math.round(c.h / 10);
+function sprite(c, kind = 'glow') {
+  const key = kind + Math.round(c.h / 10);
   if (glowSprites[key]) return glowSprites[key];
   const s = document.createElement('canvas'); s.width = s.height = 32;
-  const g = s.getContext('2d'), r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
-  r.addColorStop(0, `hsla(${c.h},100%,92%,1)`); r.addColorStop(0.35, `hsla(${c.h},95%,70%,.85)`); r.addColorStop(1, `hsla(${c.h},95%,60%,0)`);
-  g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+  const g = s.getContext('2d');
+  if (kind === 'ring') {
+    const r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    r.addColorStop(0, `hsla(${c.h},90%,80%,0.06)`); r.addColorStop(0.68, `hsla(${c.h},90%,80%,0.08)`); r.addColorStop(0.82, `hsla(${c.h},95%,85%,0.95)`); r.addColorStop(1, `hsla(${c.h},95%,70%,0)`);
+    g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+    g.fillStyle = 'rgba(255,255,255,0.8)'; g.beginPath(); g.arc(11, 10, 2.5, 0, 7); g.fill();
+  } else if (kind === 'star') {
+    const r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    r.addColorStop(0, `hsla(${c.h},95%,75%,0.6)`); r.addColorStop(1, `hsla(${c.h},95%,60%,0)`);
+    g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+    g.fillStyle = `hsla(${c.h},100%,90%,1)`; g.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? 5 : 12; g.lineTo(16 + Math.cos(a) * rad, 16 + Math.sin(a) * rad); }
+    g.closePath(); g.fill();
+  } else {
+    const r = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    r.addColorStop(0, `hsla(${c.h},100%,92%,1)`); r.addColorStop(0.35, `hsla(${c.h},95%,70%,.85)`); r.addColorStop(1, `hsla(${c.h},95%,60%,0)`);
+    g.fillStyle = r; g.fillRect(0, 0, 32, 32);
+  }
   return glowSprites[key] = s;
 }
 function press(k, src) {
@@ -289,15 +341,25 @@ function release(k, src) {
   if (k.held === 0) { if (rec) rec.events.push([+(now() - rec.start).toFixed(3), k.n, 0]); noteOff(k); if (k.bar) { k.bar.t1 = now(); k.bar = null; } burst(k, 8); }
 }
 function releaseAll() { for (const k of keys) { if (k.held) { k.held = 1; k.srcs = new Set(['x']); release(k, 'x'); } } }
+const FX_RATE = { Sparks: [0, 1.6, 4], Fountain: [0, 2.2, 5], Fireworks: [0, 0.5, 1.4], Bubbles: [0, 0.35, 0.9], Confetti: [0, 0.9, 2.2], Stars: [0, 0.5, 1.3] };
 function burst(k, n) {
   if (!state.spark) return;
-  for (let i = 0; i < n * state.spark; i++) spawn(k, 1.6);
+  const m = state.fx === 'Fireworks' ? 2.2 : state.fx === 'Bubbles' ? 0.4 : 1;
+  for (let i = 0; i < n * state.spark * m; i++) spawn(k, 1.6, true);
 }
-function spawn(k, boost = 1) {
-  if (parts.length > 900) parts.shift();
-  const x = k.bx + Math.random() * k.bw, sp = (90 + Math.random() * 260) * boost;
-  parts.push({ x, y: kbTop - 2, vx: (Math.random() - 0.5) * 90 * boost, vy: -sp, life: 0, max: 0.7 + Math.random() * 0.9,
-    r: 1.5 + Math.random() * 3.5, col: k.col });
+function spawn(k, boost = 1, isBurst = false) {
+  if (parts.length > 1100) parts.shift();
+  const R = Math.random;
+  const p = { x: k.bx + R() * k.bw, y: kbTop - 2, life: 0, col: k.col, kind: 'glow', rot: 0, spin: 0, g: 120, drag: 0.6, wob: 0 };
+  switch (state.fx) {
+    case 'Fountain': p.x = k.bx + k.bw * (0.3 + R() * 0.4); p.vx = (R() - 0.5) * 40 * boost; p.vy = -(260 + R() * 320) * boost; p.g = 440; p.drag = 0.1; p.max = 1.1 + R() * 0.8; p.r = 1.5 + R() * 2.5; break;
+    case 'Fireworks': { const a = R() * Math.PI * 2, sp = isBurst ? 160 + R() * 340 : 30 + R() * 80; p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp - 90; p.g = 190; p.drag = 1.3; p.max = 0.8 + R() * 1.1; p.r = 1.5 + R() * 3; p.trail = isBurst; } break;
+    case 'Bubbles': p.kind = 'ring'; p.vx = (R() - 0.5) * 20; p.vy = -(30 + R() * 70); p.g = -8; p.drag = 0; p.wob = 1 + R() * 2; p.max = 2 + R() * 2.5; p.r = 3 + R() * 8; break;
+    case 'Confetti': p.kind = 'conf'; p.vx = (R() - 0.5) * 240 * boost; p.vy = -(160 + R() * 320) * boost; p.g = 270; p.drag = 1.6; p.rot = R() * 6.3; p.spin = (R() - 0.5) * 14; p.max = 1.2 + R() * 1.3; p.r = 3 + R() * 4; p.col = keys[Math.floor(R() * keys.length)].col; break;
+    case 'Stars': p.kind = 'star'; p.vx = (R() - 0.5) * 60; p.vy = -(40 + R() * 130); p.g = -25; p.drag = 0.3; p.spin = (R() - 0.5) * 3; p.rot = R() * 6.3; p.max = 1.3 + R() * 1.6; p.r = 3 + R() * 5; p.tw = 3 + R() * 7; break;
+    default: p.vx = (R() - 0.5) * 90 * boost; p.vy = -(90 + R() * 260) * boost; p.max = 0.7 + R() * 0.9; p.r = 1.5 + R() * 3.5;
+  }
+  parts.push(p);
 }
 
 // ---------- drawing ----------
@@ -345,13 +407,28 @@ function frame() {
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.life += dt;
     if (p.life > p.max) { parts.splice(i, 1); continue; }
-    p.vy += 120 * dt; p.vx *= (1 - 0.6 * dt); p.x += p.vx * dt; p.y += p.vy * dt;
-    const a = 1 - p.life / p.max, s = p.r * 4 * (0.5 + a * 0.5);
-    ctx.globalAlpha = a * 0.9;
-    ctx.drawImage(sprite(p.col), p.x - s / 2, p.y - s / 2, s, s);
+    p.vy += p.g * dt; p.vx *= (1 - p.drag * dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.spin * dt;
+    if (p.wob) p.x += Math.sin(p.life * p.wob * 3) * 22 * dt;
+    const a = 1 - p.life / p.max;
+    if (p.kind === 'conf') {
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = Math.min(1, a * 1.6);
+      ctx.fillStyle = hsl(p.col, 62); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillRect(-p.r, -p.r * 0.55, p.r * 2, p.r * 1.1); ctx.restore(); ctx.globalCompositeOperation = 'lighter';
+    } else if (p.kind === 'ring') {
+      const s = p.r * 2.4 * (1 + p.life * 0.12); ctx.globalAlpha = Math.min(1, a * 1.4) * 0.85;
+      ctx.drawImage(sprite(p.col, 'ring'), p.x - s / 2, p.y - s / 2, s, s);
+    } else if (p.kind === 'star') {
+      const s = p.r * 3.2; ctx.globalAlpha = a * (0.5 + 0.5 * Math.abs(Math.sin(p.life * p.tw)));
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.drawImage(sprite(p.col, 'star'), -s / 2, -s / 2, s, s); ctx.restore();
+    } else {
+      const s = p.r * 4 * (0.5 + a * 0.5); ctx.globalAlpha = a * 0.9;
+      if (p.trail) { ctx.strokeStyle = hsl(p.col, 75, a * 0.6); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.05, p.y - p.vy * 0.05); ctx.stroke(); }
+      ctx.drawImage(sprite(p.col), p.x - s / 2, p.y - s / 2, s, s);
+    }
   }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  if (state.spark) for (const k of keys) if (k.held) { const n = state.spark === 2 ? 4 : 1.6; for (let j = 0; j < n; j++) if (Math.random() < n - j) spawn(k); }
+  if (state.spark) { const rate = (FX_RATE[state.fx] || FX_RATE.Sparks)[state.spark];
+    for (const k of keys) if (k.held) { const n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0); for (let j = 0; j < n; j++) spawn(k); } }
   drawKeyboard();
   requestAnimationFrame(frame);
 }
@@ -430,8 +507,9 @@ window.addEventListener('pagehide', () => { if (rec) stopRecording(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); else if (ac) ac.resume(); });
 
 const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16, "'": 17 };
+const inField = e => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
 window.addEventListener('keydown', e => {
-  if (e.repeat || e.metaKey || e.ctrlKey) return;
+  if (e.repeat || e.metaKey || e.ctrlKey || inField(e)) return;
   const key = e.key.toLowerCase();
   if (key === 'z') return shiftOctave(-1); if (key === 'x') return shiftOctave(1);
   if (key === ' ') { e.preventDefault(); toggleSustain(); return; }
@@ -439,14 +517,14 @@ window.addEventListener('keydown', e => {
   const k = keys[KEYMAP[key]]; if (!k) return;
   firstTouch(); press(k, 'k' + key);
 });
-window.addEventListener('keyup', e => { const key = e.key.toLowerCase(); if (key in KEYMAP) { const k = keys[KEYMAP[key]]; if (k) release(k, 'k' + key); } });
+window.addEventListener('keyup', e => { if (inField(e)) return; const key = e.key.toLowerCase(); if (key in KEYMAP) { const k = keys[KEYMAP[key]]; if (k) release(k, 'k' + key); } });
 
 // ---------- toolbar ----------
+function fill(sel, items, labels) { sel.innerHTML = ''; items.forEach((v, i) => { const o = document.createElement('option'); o.value = v; o.textContent = labels ? labels[i] : v; sel.appendChild(o); }); }
+fill($('keysSel'), KEYCOUNTS, ['1 octave', '2 octaves', '3 octaves', '4 octaves']);
+fill($('themeSel'), THEMES); fill($('voiceSel'), VOICES); fill($('fxSel'), FX); fill($('sparkSel'), [0, 1, 2], SPARK);
 function refreshUI() {
-  $('keysBtn').querySelector('.v').textContent = state.count === 13 ? '1 octave' : state.count === 25 ? '2 octaves' : '3 octaves';
-  $('themeBtn').querySelector('.v').textContent = THEMES[state.theme];
-  $('voiceBtn').querySelector('.v').textContent = VOICES[state.voice];
-  $('sparkBtn').querySelector('.v').textContent = SPARK[state.spark];
+  $('keysSel').value = state.count; $('themeSel').value = state.theme; $('voiceSel').value = state.voice; $('fxSel').value = state.fx; $('sparkSel').value = state.spark;
   $('sustainBtn').classList.toggle('on', state.sustain);
   $('labelsBtn').classList.toggle('on', state.labels);
   $('octDown').disabled = state.low <= 24; $('octUp').disabled = state.low + state.count > 96;
@@ -459,12 +537,13 @@ function shiftOctave(d) {
 function toggleSustain() { state.sustain = !state.sustain; if (!state.sustain && ac) releaseSustained(); refreshUI(); }
 $('octDown').onclick = () => shiftOctave(-1);
 $('octUp').onclick = () => shiftOctave(1);
-$('keysBtn').onclick = () => { releaseAll(); state.count = KEYCOUNTS[(KEYCOUNTS.indexOf(state.count) + 1) % 3]; if (state.low + state.count > 108) state.low = 108 - state.count; state.low = Math.floor(state.low / 12) * 12; layout(); refreshUI(); };
-$('themeBtn').onclick = () => { state.theme = (state.theme + 1) % THEMES.length; glowSprites = {}; layout(); refreshUI(); };
-$('voiceBtn').onclick = () => { state.voice = (state.voice + 1) % VOICES.length; refreshUI(); };
+$('keysSel').onchange = e => { releaseAll(); state.count = +e.target.value; if (state.low + state.count > 108) state.low = 108 - state.count; state.low = Math.floor(state.low / 12) * 12; layout(); refreshUI(); };
+$('themeSel').onchange = e => { state.theme = e.target.value; glowSprites = {}; layout(); refreshUI(); };
+$('voiceSel').onchange = e => { state.voice = e.target.value; refreshUI(); };
+$('fxSel').onchange = e => { state.fx = e.target.value; refreshUI(); };
+$('sparkSel').onchange = e => { state.spark = +e.target.value; refreshUI(); };
 $('sustainBtn').onclick = toggleSustain;
 $('labelsBtn').onclick = () => { state.labels = !state.labels; refreshUI(); };
-$('sparkBtn').onclick = () => { state.spark = (state.spark + 1) % 3; refreshUI(); };
 $('hideBtn').onclick = () => { $('bar').classList.add('hidden'); $('tab').classList.add('show'); };
 $('tab').onclick = () => { $('bar').classList.remove('hidden'); $('tab').classList.remove('show'); };
 $('helpBtn').onclick = () => $('help').classList.add('show');
@@ -488,22 +567,23 @@ let demo = null, tuneIdx = -1, rec = null;
 function fitRange(lo, hi) {
   if (lo >= state.low && hi < state.low + state.count) return;
   let low = Math.floor(lo / 12) * 12, count = state.count;
-  while (hi >= low + count && count < 37) count = count === 13 ? 25 : 37;
+  while (hi >= low + count && count < 49) count = KEYCOUNTS[KEYCOUNTS.indexOf(count) + 1];
   releaseAll(); state.count = count; state.low = Math.max(24, Math.min(low, 108 - count)); layout(); refreshUI();
 }
-function startPlayback(ev, end, btn, label) {
+function startPlayback(ev, end, btn, label, forRender) {
   stopPlayback();
   let lo = 999, hi = -999; for (const e of ev) { lo = Math.min(lo, e.n); hi = Math.max(hi, e.n); }
   fitRange(lo, hi);
   const lead = kbTop / speed() + 0.2;
-  demo = { ev, start: now() + lead, end: end + 0.8, btn, label: btn.textContent };
+  demo = { ev, start: now() + lead, end: end + 0.8, btn, label: btn.textContent, forRender };
   btn.textContent = '■ Stop: ' + label; btn.classList.add('on');
   ensureAudio(); firstTouch();
 }
 function stopPlayback() {
   if (!demo) return;
   for (const k of keys) release(k, 'demo');
-  demo.btn.textContent = demo.label; demo.btn.classList.remove('on'); demo = null;
+  demo.btn.textContent = demo.label; demo.btn.classList.remove('on'); const wasRender = demo.forRender; demo = null;
+  if (wasRender && render) setTimeout(() => { if (render && render.mr.state !== 'inactive') render.mr.stop(); }, 900);
 }
 function stopTune() { stopPlayback(); }
 function startTune() {
@@ -532,6 +612,7 @@ function saveRecs() { try { localStorage.setItem('glowPianoRecs', JSON.stringify
 function startRecording() {
   ensureAudio(); firstTouch();
   rec = { start: now(), events: [], voice: state.voice };
+  if (demo && !demo.forRender) stopPlayback();
   $('recBtn').classList.add('rec'); $('recBtn').querySelector('.t').textContent = '■ Stop'; $('recTime').textContent = '0:00';
 }
 function stopRecording() {
@@ -541,9 +622,18 @@ function stopRecording() {
   for (const k of keys) if (k.held) r.events.push([+(now() - r.start).toFixed(3), k.n, 0]);
   if (!r.events.length) return;
   const n = recordings.reduce((m, x) => Math.max(m, x.num || 0), 0) + 1;
-  recordings.push({ num: n, name: 'Recording ' + n, date: new Date().toLocaleDateString(), voice: r.voice, length: r.events[r.events.length - 1][0], events: r.events });
-  saveRecs(); refreshRecUI();
+  const entry = { num: n, name: 'Recording ' + n, date: new Date().toLocaleDateString(), voice: r.voice, length: r.events[r.events.length - 1][0], events: r.events };
+  recordings.push(entry); saveRecs(); refreshRecUI();
+  askName('Name your recording', entry.name, v => { entry.name = v; saveRecs(); refreshRecUI(); });
 }
+function askName(title, current, cb) {
+  $('nameTitle').textContent = title; const inp = $('nameInput'); inp.value = current;
+  $('name').classList.add('show'); setTimeout(() => { inp.focus(); inp.select(); }, 50);
+  const done = ok => { $('name').classList.remove('show'); inp.onkeydown = null; const v = inp.value.trim().slice(0, 40); if (ok && v) cb(v); };
+  $('nameSave').onclick = () => done(true); $('nameCancel').onclick = () => done(false);
+  inp.onkeydown = e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+}
+function voiceOf(r) { return typeof r.voice === 'number' ? OLD_VOICES[r.voice] : r.voice; }
 function toEvents(r) {
   const ev = [], open = new Map();
   for (const [t, n, on] of r.events) {
@@ -552,11 +642,60 @@ function toEvents(r) {
   }
   return ev;
 }
-function playRecording(r, btn) {
+function playRecording(r, btn, forRender) {
   if (rec) stopRecording();
-  if (VOICES[r.voice]) { state.voice = r.voice; refreshUI(); }
-  startPlayback(toEvents(r), r.length, btn || $('playBtn'), r.name);
+  const v = voiceOf(r); if (VOICES.includes(v)) { state.voice = v; refreshUI(); }
+  startPlayback(toEvents(r), r.length, btn || $('playBtn'), r.name, forRender);
 }
+
+// ---------- video export ----------
+let render = null;
+function pickMime() {
+  const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return list.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; } }) || '';
+}
+function startRender(r) {
+  if (!window.MediaRecorder || !canvas.captureStream) { alert('Saving video is not supported in this browser. On an iPad use Safari.'); return; }
+  if (render) return;
+  ensureAudio(); $('list').classList.remove('show');
+  try {
+    if (!audioDest) { audioDest = ac.createMediaStreamDestination(); finalNode.connect(audioDest); }
+    const vs = canvas.captureStream(30);
+    const stream = new MediaStream([...vs.getVideoTracks(), ...audioDest.stream.getAudioTracks()]);
+    const mime = pickMime(), opts = { videoBitsPerSecond: 8000000 }; if (mime) opts.mimeType = mime;
+    const mr = new MediaRecorder(stream, opts), chunks = [];
+    mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onerror = () => { alert('Sorry, the video could not be made in this browser.'); cancelRender(); };
+    mr.onstop = () => {
+      $('renderBox').classList.remove('show');
+      const cancelled = render && render.cancelled; render = null;
+      if (cancelled || !chunks.length) return;
+      const type = mr.mimeType || mime || 'video/webm';
+      const blob = new Blob(chunks, { type }), ext = /mp4/.test(type) ? 'mp4' : 'webm';
+      showVideo(blob, r.name, ext);
+    };
+    render = { mr, r, cancelled: false, start: now() };
+    mr.start(500);
+    $('renderText').textContent = 'Making video of ' + r.name + '… keep this screen open'; $('renderBox').classList.add('show');
+    playRecording(r, $('playBtn'), true);
+  } catch (e) { render = null; alert('Sorry, the video could not be made in this browser.'); }
+}
+function cancelRender() { if (!render) return; render.cancelled = true; try { render.mr.stop(); } catch (e) {} if (demo && demo.forRender) stopPlayback(); $('renderBox').classList.remove('show'); render = null; }
+let videoBlob = null, videoName = '';
+function showVideo(blob, name, ext) {
+  videoBlob = blob; videoName = name.replace(/[\\/:*?"<>|]/g, '-') + '.' + ext;
+  $('videoInfo').textContent = videoName + ' (' + (blob.size / 1048576).toFixed(1) + ' MB). Tap Save video, then choose Save Video or Save to Files.';
+  $('video').classList.add('show');
+}
+$('videoSave').onclick = async () => {
+  if (!videoBlob) return;
+  const file = new File([videoBlob], videoName, { type: videoBlob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: videoName }); } catch (e) {} return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(videoBlob); a.download = videoName; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+};
+$('videoClose').onclick = () => { $('video').classList.remove('show'); videoBlob = null; };
+$('renderCancel').onclick = cancelRender;
 function refreshRecUI() {
   const has = recordings.length > 0;
   $('playBtn').style.display = has ? '' : 'none';
@@ -569,16 +708,18 @@ function refreshRecUI() {
   [...recordings].reverse().forEach(r => {
     const row = document.createElement('div'); row.className = 'row';
     const name = document.createElement('span'); name.className = 'name'; name.textContent = r.name; name.title = 'Tap to rename';
-    name.onclick = () => { const v = prompt('Name this recording', r.name); if (v && v.trim()) { r.name = v.trim().slice(0, 40); saveRecs(); refreshRecUI(); } };
+    name.onclick = () => askName('Rename recording', r.name, v => { r.name = v; saveRecs(); refreshRecUI(); });
     const len = document.createElement('span'); len.className = 'len'; len.textContent = fmt(r.length) + ' · ' + r.date;
     const play = document.createElement('button'); play.textContent = '▶';
     play.onclick = () => { $('list').classList.remove('show'); playRecording(r); };
+    const vid = document.createElement('button'); vid.textContent = '🎬'; vid.title = 'Save as video';
+    vid.onclick = () => startRender(r);
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
     del.onclick = () => {
       if (!del.classList.contains('sure')) { del.classList.add('sure'); del.textContent = 'Sure?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕'; }, 2500); return; }
       recordings = recordings.filter(x => x !== r); saveRecs(); refreshRecUI();
     };
-    row.append(name, len, play, del); box.appendChild(row);
+    row.append(name, len, play, vid, del); box.appendChild(row);
   });
 }
 $('list').innerHTML = '<div class="card"><h2>My recordings</h2><div class="rows"></div><p style="margin-top:14px"><button id="listClose">Close</button></p></div>';
