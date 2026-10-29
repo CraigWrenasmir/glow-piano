@@ -119,6 +119,7 @@
 <div id="settings">
   <div class="row"><div class="lab">Keys</div><div class="chips" id="keysChips"></div></div>
   <div class="row"><div class="lab">Colours</div><div class="chips" id="themeChips"></div></div>
+  <div class="row"><div class="lab">Background</div><div class="chips" id="bgChips"></div></div>
   <div class="row"><div class="lab">Effect</div><div class="chips" id="fxChips"></div></div>
   <div class="row"><div class="lab">Sparkle</div><div class="chips" id="sparkChips"></div></div>
   <div class="row"><div class="lab">Sound</div><div class="chips" id="voiceChips"></div></div>
@@ -138,7 +139,7 @@
     <p>Tap the keys at the bottom. Hold a key to grow a long note. Slide your finger across the keys for a glissando. Use lots of fingers at once.</p>
     <ul>
       <li><b>− / +</b> moves the whole keyboard an octave lower or higher.</li>
-      <li><b>⚙ Settings</b> has everything else: how many octaves, the colours, the particle effect and how much sparkle, the instrument sound, sustain and the letters on the keys.</li>
+      <li><b>⚙ Settings</b> has everything else: how many octaves, the colours, the background scene, the particle effect and how much sparkle, the instrument sound, sustain and the letters on the keys.</li>
       <li><b>♪ Tune</b> plays a built-in tune with the notes falling onto the keys. Tap again for the next tune.</li>
       <li><b>🎬</b> in the 🎞 recordings list turns a recording into a video with sound. It replays in real time, so keep the screen open, then tap <b>Save video</b> to save it to Photos or Files.</li>
       <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>🎞</b> lists them all. Tap a name to rename it.</li>
@@ -164,13 +165,15 @@ const FX = ['Sparks', 'Fountain', 'Fireworks', 'Bubbles', 'Confetti', 'Stars'];
 const SPARK = ['Off', 'Some', 'Lots'];
 const KEYCOUNTS = [13, 25, 37, 49];
 const OLD_THEMES = ['Rainbow', 'Notes', 'Ocean', 'Sunset', 'Classic'], OLD_VOICES = ['Piano', 'Soft', 'Bells', 'Retro'];
-const state = { low: 48, count: 25, theme: 'Rainbow', voice: 'Piano', fx: 'Sparks', sustain: false, labels: true, spark: 1 };
+const BGS = ['Plain', 'Night sky', 'Space', 'Underwater', 'Backrooms', 'Northern lights', 'Retro grid'];
+const state = { low: 48, count: 25, theme: 'Rainbow', voice: 'Piano', fx: 'Sparks', bg: 'Plain', sustain: false, labels: true, spark: 1 };
 try { Object.assign(state, JSON.parse(localStorage.getItem('glowPiano') || '{}')); } catch (e) {}
 if (typeof state.theme === 'number') state.theme = OLD_THEMES[state.theme] || 'Rainbow';
 if (typeof state.voice === 'number') state.voice = OLD_VOICES[state.voice] || 'Piano';
 if (!THEMES.includes(state.theme)) state.theme = 'Rainbow';
 if (!VOICES.includes(state.voice)) state.voice = 'Piano';
 if (!FX.includes(state.fx)) state.fx = 'Sparks';
+if (!BGS.includes(state.bg)) state.bg = 'Plain';
 state.low = Math.round(state.low / 12) * 12;
 if (!KEYCOUNTS.includes(state.count)) state.count = 25;
 function save() { try { localStorage.setItem('glowPiano', JSON.stringify(state)); } catch (e) {} }
@@ -355,7 +358,7 @@ function sprite(c, kind = 'glow') {
 function press(k, src) {
   if (k.held === 0) {
     if (rec) rec.events.push([+(now() - rec.start).toFixed(3), k.n, 1]);
-    noteOn(k);
+    noteOn(k); bgHit(k);
     if (src !== 'demo') { k.bar = { k, t0: now(), t1: null, col: k.col }; bars.push(k.bar); }
     burst(k, 14);
   }
@@ -388,15 +391,160 @@ function spawn(k, boost = 1, isBurst = false) {
   parts.push(p);
 }
 
+// ---------- backgrounds ----------
+let energy = 0, bgCache = {}, bgSize = '';
+const rnd = Math.random;
+function bgHit(k) {
+  energy = Math.min(1, energy + 0.3);
+  const hx = k.x + k.w / 2, pos = k.i / Math.max(1, keys.length - 1);
+  if (state.bg === 'Space' && pos > 0.55 && rnd() < 0.85) shots.push({ x: rnd() * W * 0.8, y: rnd() * kbTop * 0.35, vx: 520 + rnd() * 320, vy: 230 + rnd() * 160, life: 0, max: 0.6 + rnd() * 0.3 });
+  if (state.bg === 'Underwater') for (const f of fishes()) if (Math.abs(f.x - hx) < 240) { f.dir = f.x < hx ? -1 : 1; f.boost = 320 + rnd() * 120; f.y = Math.max(20, f.y - 25); }
+  if (state.bg === 'Backrooms') { const ps = panels(); let best = ps[0]; for (const p of ps) if (Math.abs(p.x - hx) < Math.abs(best.x - hx)) best = p; best.f = 1.7; }
+}
+function vgrad(key, stops, y0 = 0, y1 = H) {
+  const k = 'g' + key; if (bgCache[k]) return bgCache[k];
+  const g = ctx.createLinearGradient(0, y0, 0, y1); stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c)); return bgCache[k] = g;
+}
+function stars(key, n) { return bgCache[key] || (bgCache[key] = Array.from({ length: n }, () => ({ x: rnd(), y: rnd(), r: 0.4 + rnd() * 1.4, p: rnd() * 6.3, s: 0.5 + rnd() * 2 }))); }
+function drawStars(list, t, bright, drift) {
+  ctx.fillStyle = '#fff';
+  for (const st of list) {
+    const a = Math.min(1, (0.35 + 0.65 * Math.abs(Math.sin(t * st.s + st.p))) * bright);
+    const x = ((st.x + t * drift) % 1) * W, y = st.y * kbTop * 0.95, r = st.r * (1 + energy * 0.9);
+    ctx.globalAlpha = a; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    if (st.r > 1.3) { ctx.globalAlpha = a * 0.5; ctx.fillRect(x - r * 3, y - 0.5, r * 6, 1); ctx.fillRect(x - 0.5, y - r * 3, 1, r * 6); }
+  }
+  ctx.globalAlpha = 1;
+}
+let shots = [];
+function nebula() {
+  if (bgCache.nebula) return bgCache.nebula;
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W / 2)); c.height = Math.max(1, Math.round(kbTop / 2)); const g = c.getContext('2d');
+  [[280, 0.2, 0.35], [200, 0.65, 0.55], [330, 0.45, 0.15], [170, 0.9, 0.8]].forEach(([h, fx, fy], i) => {
+    const r = Math.max(c.width, c.height) * (0.35 + i * 0.08), x = fx * c.width, y = fy * c.height;
+    const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `hsla(${h},80%,55%,0.32)`); rg.addColorStop(0.5, `hsla(${h},80%,45%,0.12)`); rg.addColorStop(1, `hsla(${h},80%,40%,0)`);
+    g.fillStyle = rg; g.fillRect(0, 0, c.width, c.height);
+  });
+  return bgCache.nebula = c;
+}
+function bubbles() { return bgCache.bub || (bgCache.bub = Array.from({ length: 36 }, () => ({ x: rnd(), y: rnd(), r: 2 + rnd() * 5, s: 0.025 + rnd() * 0.05, p: rnd() * 6.3 }))); }
+function fishes() { return bgCache.fish || (bgCache.fish = Array.from({ length: 9 }, (_, i) => ({ x: rnd() * W, y: (0.1 + rnd() * 0.75) * kbTop, dir: rnd() < 0.5 ? -1 : 1, sp: 35 + rnd() * 55, size: 12 + rnd() * 14, hue: [25, 45, 190, 320, 55, 200, 10, 280, 160][i], ph: rnd() * 6.3, boost: 0 }))); }
+function drawFish(f, t) {
+  ctx.save(); ctx.translate(f.x, f.y); ctx.scale(f.dir, 1);
+  const sz = f.size, wag = Math.sin(t * 9 + f.ph) * 0.35;
+  ctx.fillStyle = `hsl(${f.hue},75%,58%)`;
+  ctx.beginPath(); ctx.moveTo(-sz * 0.8, 0); ctx.lineTo(-sz * 1.5, -sz * 0.5 + wag * sz); ctx.lineTo(-sz * 1.5, sz * 0.5 + wag * sz); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, sz, sz * 0.48, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = `hsl(${f.hue},75%,45%)`; ctx.beginPath(); ctx.ellipse(-sz * 0.1, 0, sz * 0.35, sz * 0.3, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sz * 0.55, -sz * 0.12, sz * 0.14, 0, 7); ctx.fill();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(sz * 0.6, -sz * 0.12, sz * 0.07, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function wallpaper() {
+  if (bgCache.wall) return bgCache.wall;
+  const c = document.createElement('canvas'); c.width = 96; c.height = 96; const g = c.getContext('2d');
+  g.fillStyle = '#5a4e22'; g.fillRect(0, 0, 96, 96);
+  g.fillStyle = '#665a2a'; for (let x = 0; x < 96; x += 24) g.fillRect(x, 0, 10, 96);
+  g.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 140; i++) g.fillRect(rnd() * 96, rnd() * 96, 1.5, 1.5);
+  g.fillStyle = 'rgba(255,240,170,0.06)'; for (let i = 0; i < 40; i++) g.fillRect(rnd() * 96, rnd() * 96, 2, 2);
+  return bgCache.wall = ctx.createPattern(c, 'repeat');
+}
+function panels() { return bgCache.panels || (bgCache.panels = [0.16, 0.39, 0.62, 0.85].map(fx => ({ x: fx * W, f: 0.8 }))); }
+function strip(key, c1, c2) {
+  if (bgCache[key]) return bgCache[key];
+  const c = document.createElement('canvas'); c.width = 2; c.height = 256; const g = c.getContext('2d'), lg = g.createLinearGradient(0, 0, 0, 256);
+  lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(0.18, c1); lg.addColorStop(0.6, c2); lg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = lg; g.fillRect(0, 0, 2, 256); return bgCache[key] = c;
+}
+function drawBackground(t, dt) {
+  energy *= Math.max(0, 1 - 1.7 * dt);
+  const size = W + 'x' + H; if (bgSize !== size) { bgSize = size; bgCache = {}; }
+  const bg = state.bg;
+  if (bg === 'Plain') { ctx.fillStyle = vgrad('plain', ['#05050c', '#10101f']); ctx.fillRect(0, 0, W, H); return; }
+  if (bg === 'Night sky') {
+    ctx.fillStyle = vgrad('night', ['#03031a', '#0b0f33', '#162050']); ctx.fillRect(0, 0, W, H);
+    drawStars(stars('ns', 170), t, 1, 0.003);
+    const mx = W * 0.86, my = kbTop * 0.2, mr = Math.min(W, H) * 0.05;
+    const glow = ctx.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 4); glow.addColorStop(0, `rgba(255,250,220,${0.18 + energy * 0.15})`); glow.addColorStop(1, 'rgba(255,250,220,0)');
+    ctx.fillStyle = glow; ctx.fillRect(mx - mr * 4, my - mr * 4, mr * 8, mr * 8);
+    ctx.fillStyle = '#fff8dc'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 7); ctx.fill();
+    ctx.fillStyle = vgrad('night'); ctx.beginPath(); ctx.arc(mx - mr * 0.45, my - mr * 0.15, mr * 0.9, 0, 7); ctx.fill();
+  } else if (bg === 'Space') {
+    ctx.fillStyle = vgrad('space', ['#02020c', '#090420', '#140a33']); ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 0.65 + energy * 0.35; ctx.drawImage(nebula(), 0, 0, W, kbTop); ctx.globalAlpha = 1;
+    drawStars(stars('sp', 230), t, 1, 0.004);
+    const cx = W * 0.8, cy = kbTop * 0.3, r = Math.min(W, H) * 0.085;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.35);
+    ctx.strokeStyle = 'rgba(230,200,255,0.55)'; ctx.lineWidth = r * 0.16; ctx.beginPath(); ctx.ellipse(0, 0, r * 1.9, r * 0.45, 0, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.rotate(0.35);
+    const pg = ctx.createRadialGradient(-r * 0.4, -r * 0.4, r * 0.1, 0, 0, r); pg.addColorStop(0, '#ffd9a8'); pg.addColorStop(0.6, '#e08a4a'); pg.addColorStop(1, '#6b2f1c');
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.clip(); ctx.fillStyle = 'rgba(120,50,30,0.35)'; ctx.fillRect(-r, -r * 0.3, r * 2, r * 0.12); ctx.fillRect(-r, r * 0.25, r * 2, r * 0.18); ctx.fillRect(-r, -r * 0.7, r * 2, r * 0.08); ctx.restore();
+    ctx.rotate(-0.35); ctx.beginPath(); ctx.ellipse(0, 0, r * 1.9, r * 0.45, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+    for (let i = shots.length - 1; i >= 0; i--) { const sh = shots[i]; sh.life += dt; if (sh.life > sh.max) { shots.splice(i, 1); continue; }
+      sh.x += sh.vx * dt; sh.y += sh.vy * dt; const a = 1 - sh.life / sh.max;
+      const lg = ctx.createLinearGradient(sh.x, sh.y, sh.x - sh.vx * 0.14, sh.y - sh.vy * 0.14); lg.addColorStop(0, `rgba(255,255,255,${a})`); lg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = lg; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(sh.x - sh.vx * 0.14, sh.y - sh.vy * 0.14); ctx.stroke(); }
+  } else if (bg === 'Underwater') {
+    ctx.fillStyle = vgrad('water', ['#1a9ab8', '#0b5f86', '#063556', '#031f38']); ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(190,235,255,${0.06 + energy * 0.09})`;
+    for (let i = 0; i < 6; i++) { const x0 = W * (0.05 + i * 0.17) + Math.sin(t * 0.3 + i * 1.7) * 50; ctx.beginPath(); ctx.moveTo(x0 - 25, 0); ctx.lineTo(x0 + 35, 0); ctx.lineTo(x0 + 230, kbTop); ctx.lineTo(x0 + 80, kbTop); ctx.closePath(); ctx.fill(); }
+    for (const f of fishes()) { f.x += f.dir * (f.sp + f.boost) * dt; f.boost *= Math.max(0, 1 - 2.5 * dt); f.y += Math.sin(t * 1.5 + f.ph) * 12 * dt;
+      if (f.x < -60) f.dir = 1; if (f.x > W + 60) f.dir = -1; drawFish(f, t); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.2;
+    for (const b of bubbles()) { b.y -= b.s * dt * (1 + energy); if (b.y < -0.02) { b.y = 1; b.x = rnd(); } const x = b.x * W + Math.sin(t * 2 + b.p) * 6, y = b.y * kbTop;
+      ctx.beginPath(); ctx.arc(x, y, b.r, 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x - b.r * 0.35, y - b.r * 0.35, b.r * 0.25, 0, 7); ctx.fill(); }
+  } else if (bg === 'Backrooms') {
+    ctx.fillStyle = wallpaper(); ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = vgrad('wallshade', ['rgba(0,0,0,0.25)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']); ctx.fillRect(0, 0, W, H);
+    const py = kbTop * 0.15, pw = W * 0.13, ph = Math.max(10, H * 0.02);
+    for (const p of panels()) {
+      if (rnd() < 0.025) p.f = 0.25 + rnd() * 0.3; p.f += (0.85 - p.f) * Math.min(1, 4 * dt);
+      const f = Math.min(1.7, p.f);
+      const lg = ctx.createLinearGradient(0, py, 0, py + kbTop * 0.7); lg.addColorStop(0, `rgba(255,248,200,${0.22 * f})`); lg.addColorStop(1, 'rgba(255,248,200,0)');
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(p.x - pw / 2, py); ctx.lineTo(p.x + pw / 2, py); ctx.lineTo(p.x + pw * 1.3, py + kbTop * 0.7); ctx.lineTo(p.x - pw * 1.3, py + kbTop * 0.7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2a2614'; ctx.fillRect(p.x - pw / 2 - 3, py - 3, pw + 6, ph + 6);
+      ctx.fillStyle = `rgba(255,250,215,${Math.min(1, 0.45 + f * 0.5)})`; ctx.fillRect(p.x - pw / 2, py, pw, ph);
+    }
+  } else if (bg === 'Northern lights') {
+    ctx.fillStyle = vgrad('aurora', ['#020611', '#061227', '#0b1d3a']); ctx.fillRect(0, 0, W, H);
+    drawStars(stars('au', 130), t, 0.8, 0.002);
+    const curtains = [[strip('c1', 'rgba(92,255,154,0.9)', 'rgba(56,214,255,0.5)'), 0, 0], [strip('c2', 'rgba(255,106,213,0.8)', 'rgba(138,91,255,0.45)'), 2.1, 0.12], [strip('c3', 'rgba(120,255,120,0.8)', 'rgba(255,230,120,0.35)'), 4.2, 0.26]];
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [img, ph, off] of curtains) for (let x = 0; x < W; x += 6) {
+      const top = kbTop * (0.08 + off) + Math.sin(x * 0.006 + t * 0.35 + ph) * 55 + Math.sin(x * 0.021 - t * 0.6 + ph) * 22;
+      const h = 150 + Math.sin(x * 0.013 + t * 0.8 + ph) * 70 + energy * 90;
+      ctx.globalAlpha = (0.28 + energy * 0.5) * (0.55 + 0.45 * Math.sin(x * 0.03 + t * 1.3 + ph));
+      ctx.drawImage(img, x, top, 7, h);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  } else if (bg === 'Retro grid') {
+    const hz = kbTop * 0.6;
+    ctx.fillStyle = vgrad('retroSky', ['#120327', '#3a0a5e', '#8f1b6e', '#ff5a8a'], 0, hz); ctx.fillRect(0, 0, W, hz);
+    drawStars(stars('rg', 70), t, 0.6, 0.001);
+    const cx = W / 2, r = Math.min(W, H) * 0.17, cy = hz - r * 0.25;
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip();
+    ctx.fillStyle = vgrad('sun', ['#ffe66d', '#ff9a3c', '#ff3f8e'], cy - r, cy + r); ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.fillStyle = 'rgba(40,5,70,0.95)'; for (let i = 0; i < 7; i++) { const y = cy + r * 0.05 + i * r * 0.14, hh = 2 + i * 2.2; ctx.fillRect(cx - r, y, r * 2, hh); }
+    ctx.fillStyle = 'rgba(40,5,70,0.95)'; ctx.fillRect(cx - r, hz, r * 2, r); ctx.restore();
+    ctx.fillStyle = '#140626'; ctx.fillRect(0, hz, W, H - hz);
+    ctx.strokeStyle = `hsla(300,100%,66%,${0.35 + energy * 0.55})`; ctx.lineWidth = 1.5;
+    ctx.beginPath(); for (let i = -14; i <= 14; i++) { ctx.moveTo(cx, hz); ctx.lineTo(cx + i * W * 0.1, H); } ctx.stroke();
+    ctx.beginPath(); for (let j = 0; j < 16; j++) { const z = ((j / 16) + (t * 0.22) % 1) % 1, y = hz + (H - hz) * z * z; ctx.moveTo(0, y); ctx.lineTo(W, y); } ctx.stroke();
+    ctx.strokeStyle = `hsla(320,100%,75%,${0.7 + energy * 0.3})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, hz); ctx.lineTo(W, hz); ctx.stroke();
+  }
+  ctx.fillStyle = vgrad('shade', ['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)'], kbTop - 170, kbTop); ctx.fillRect(0, kbTop - 170, W, 170);
+}
+
 // ---------- drawing ----------
-let last = now(), bgGrad = null, bgW = 0, bgH = 0;
+let last = now();
 function frame() {
   const t = now(), dt = Math.min(0.05, t - last); last = t;
   demoTick(t);
   // background
-  if (bgW !== W || bgH !== H) { bgGrad = ctx.createLinearGradient(0, 0, 0, H); bgGrad.addColorStop(0, '#05050c'); bgGrad.addColorStop(1, '#10101f'); bgW = W; bgH = H; }
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
+  drawBackground(t, dt);
   // octave guide lines
   ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
   for (const k of keys) if (k.pc === 0 && k.i > 0) { ctx.beginPath(); ctx.moveTo(k.x + 0.5, 0); ctx.lineTo(k.x + 0.5, kbTop); ctx.stroke(); }
@@ -569,10 +717,12 @@ const NOTE_NAME = n => NAMES[n % 12] + (Math.floor(n / 12) - 1);
 chips($('keysChips'), KEYCOUNTS, { label: v => (v - 1) / 12 + (v === 13 ? ' octave' : ' octaves'), pick: v => { releaseAll(); state.count = v; if (state.low + state.count > 108) state.low = 108 - state.count; state.low = Math.floor(state.low / 12) * 12; layout(); refreshUI(); } });
 chips($('themeChips'), THEMES, { swatch: themeSwatch, pick: v => { state.theme = v; glowSprites = {}; layout(); refreshUI(); } });
 chips($('fxChips'), FX, { icon: FX_ICON, pick: v => { state.fx = v; refreshUI(); } });
+const BG_ICON = { Plain: '⬛', 'Night sky': '🌙', Space: '🪐', Underwater: '🐠', Backrooms: '🚪', 'Northern lights': '🌌', 'Retro grid': '🌇' };
+chips($('bgChips'), BGS, { icon: BG_ICON, pick: v => { state.bg = v; shots = []; refreshUI(); } });
 chips($('sparkChips'), [0, 1, 2], { label: v => SPARK[v], pick: v => { state.spark = v; refreshUI(); } });
 chips($('voiceChips'), VOICES, { icon: VOICE_ICON, pick: v => { state.voice = v; refreshUI(); } });
 function refreshUI() {
-  mark($('keysChips'), state.count); mark($('themeChips'), state.theme); mark($('fxChips'), state.fx); mark($('sparkChips'), state.spark); mark($('voiceChips'), state.voice);
+  mark($('keysChips'), state.count); mark($('themeChips'), state.theme); mark($('bgChips'), state.bg); mark($('fxChips'), state.fx); mark($('sparkChips'), state.spark); mark($('voiceChips'), state.voice);
   $('sustainBtn').classList.toggle('on', state.sustain);
   $('labelsBtn').classList.toggle('on', state.labels);
   $('octDown').disabled = state.low <= 24; $('octUp').disabled = state.low + state.count > 96;
