@@ -27,6 +27,14 @@
   #bar button:active{ background:rgba(255,255,255,.2); }
   #bar button.on{ background:rgba(138,209,255,.22); border-color:rgba(138,209,255,.6); }
   #bar button .v{ color:var(--accent); font-weight:700; }
+  #bar button.rec{ background:rgba(255,80,90,.25); border-color:rgba(255,80,90,.8); color:#ffb3b8; }
+  #list .row{ display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+  #list .row .name{ flex:1; font-size:16px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+  #list .row .len{ color:var(--muted); font-size:14px; }
+  #list .row button{ min-width:44px; }
+  #list .row button.del{ background:#3a2a32; color:#ffb3b8; }
+  #list .row button.del.sure{ background:#b8303c; color:#fff; }
+  #list .empty{ color:var(--muted); }
   #bar .sp{ flex:1; }
   #bar .title{ font-weight:800; font-size:16px; letter-spacing:.3px; padding-right:4px; }
   #tab{ position:fixed; top:0; left:50%; transform:translateX(-50%); z-index:6; border:0; border-radius:0 0 12px 12px;
@@ -38,14 +46,14 @@
     background:linear-gradient(90deg,#ff6b6b,#ffd166,#06d6a0,#4cc9f0,#c77dff); -webkit-background-clip:text; background-clip:text; color:transparent; }
   #hint p{ margin:0; color:var(--muted); font-size:clamp(15px,2.2vw,20px); }
   #hint.gone{ opacity:0; }
-  #help{ position:fixed; inset:0; z-index:10; background:rgba(4,4,12,.8); display:none; align-items:center; justify-content:center; padding:20px; }
-  #help.show{ display:flex; }
-  #help .card{ background:#13131f; border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:22px 24px; max-width:560px; width:100%; max-height:85vh; overflow:auto; }
-  #help h2{ margin:0 0 12px; font-size:22px; }
-  #help p, #help li{ color:#d6d6ea; font-size:16px; line-height:1.5; }
-  #help ul{ padding-left:20px; margin:8px 0 14px; }
-  #help kbd{ background:#23233a; border-radius:5px; padding:1px 6px; font-family:ui-monospace,Menlo,monospace; font-size:14px; }
-  #help button{ appearance:none; border:0; background:var(--accent); color:#06121c; font-weight:700; font-size:16px; border-radius:12px; min-height:44px; padding:0 20px; cursor:pointer; }
+  .overlay{ position:fixed; inset:0; z-index:10; background:rgba(4,4,12,.8); display:none; align-items:center; justify-content:center; padding:20px; }
+  .overlay.show{ display:flex; }
+  .overlay .card{ background:#13131f; border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:22px 24px; max-width:560px; width:100%; max-height:85vh; overflow:auto; }
+  .overlay h2{ margin:0 0 12px; font-size:22px; }
+  .overlay p, .overlay li{ color:#d6d6ea; font-size:16px; line-height:1.5; }
+  .overlay ul{ padding-left:20px; margin:8px 0 14px; }
+  .overlay kbd{ background:#23233a; border-radius:5px; padding:1px 6px; font-family:ui-monospace,Menlo,monospace; font-size:14px; }
+  .overlay button{ appearance:none; border:0; background:var(--accent); color:#06121c; font-weight:700; font-size:16px; border-radius:12px; min-height:44px; padding:0 20px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -62,6 +70,9 @@
   <button id="labelsBtn">Letters</button>
   <button id="sparkBtn">Sparkle <span class="v"></span></button>
   <button id="tuneBtn">♪ Play a tune</button>
+  <button id="recBtn">● Record</button>
+  <button id="playBtn" style="display:none">▶ Play back</button>
+  <button id="listBtn" style="display:none">My recordings <span class="v"></span></button>
   <span class="sp"></span>
   <button id="helpBtn">?</button>
   <button id="fsBtn" style="display:none">⤢</button>
@@ -71,7 +82,8 @@
 
 <div id="hint"><h1>Glow Piano</h1><p>Tap the keys to play</p></div>
 
-<div id="help">
+<div id="list" class="overlay"></div>
+<div id="help" class="overlay">
   <div class="card">
     <h2>How to play</h2>
     <p>Tap the keys at the bottom. Hold a key to grow a long note. Slide your finger across the keys for a glissando. Use lots of fingers at once.</p>
@@ -81,6 +93,7 @@
       <li><b>Colours</b> changes the glow. <i>Notes</i> gives every note name its own colour.</li>
       <li><b>Sound</b> picks the instrument. <b>Sustain</b> lets notes ring on after you let go.</li>
       <li><b>Letters</b> shows note names on the keys. <b>Sparkle</b> sets how many particles fly.</li>
+      <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording, and <b>My recordings</b> keeps them all. Tap a name to rename it.</li>
       <li><b>▲</b> hides the toolbar so the whole screen is piano. Tap <b>▼ menu</b> to bring it back.</li>
     </ul>
     <p><b>On an iPad:</b> in Safari tap the Share button, then <b>Add to Home Screen</b>. It then opens full screen like an app.</p>
@@ -262,6 +275,7 @@ function sprite(c) {
 }
 function press(k, src) {
   if (k.held === 0) {
+    if (rec) rec.events.push([+(now() - rec.start).toFixed(3), k.n, 1]);
     noteOn(k);
     k.bar = { k, t0: now(), t1: null, col: k.col };
     bars.push(k.bar);
@@ -272,7 +286,7 @@ function press(k, src) {
 function release(k, src) {
   if (!k.srcs || !k.srcs.has(src)) return;
   k.srcs.delete(src); k.held = Math.max(0, k.held - 1);
-  if (k.held === 0) { noteOff(k); if (k.bar) { k.bar.t1 = now(); k.bar = null; } burst(k, 8); }
+  if (k.held === 0) { if (rec) rec.events.push([+(now() - rec.start).toFixed(3), k.n, 0]); noteOff(k); if (k.bar) { k.bar.t1 = now(); k.bar = null; } burst(k, 8); }
 }
 function releaseAll() { for (const k of keys) { if (k.held) { k.held = 1; k.srcs = new Set(['x']); release(k, 'x'); } } }
 function burst(k, n) {
@@ -400,6 +414,7 @@ canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel
 document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 document.addEventListener('gesturestart', e => e.preventDefault());
 window.addEventListener('blur', releaseAll);
+window.addEventListener('pagehide', () => { if (rec) stopRecording(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); else if (ac) ac.resume(); });
 
 const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15, ';': 16, "'": 17 };
@@ -457,35 +472,110 @@ const TUNES = [
   { name: 'Mary Had a Little Lamb', bpm: 126, notes: '64 62 60 62 64 64 64:2 62 62 62:2 64 67 67:2 64 62 60 62 64 64 64 64 62 62 64 62 60:4' },
   { name: 'Frère Jacques', bpm: 120, notes: '60 62 64 60 60 62 64 60 64 65 67:2 64 65 67:2 67:0.5 69:0.5 67:0.5 65:0.5 64 60 67:0.5 69:0.5 67:0.5 65:0.5 64 60 60 55 60:2 60 55 60:2' },
 ];
-let demo = null, tuneIdx = -1;
-function startTune() {
-  stopTune(); tuneIdx = (tuneIdx + 1) % TUNES.length;
-  const tune = TUNES[tuneIdx], beat = 60 / tune.bpm; const ev = []; let t = 0, lo = 999, hi = -999;
-  for (const tok of tune.notes.trim().split(/\s+/)) { const [n, d = '1'] = tok.split(':'); const midi = +n, dur = +d * beat;
-    ev.push({ n: midi, on: t, off: t + Math.min(dur * 0.85, dur - 0.06) }); t += dur; lo = Math.min(lo, midi); hi = Math.max(hi, midi); }
-  if (lo < state.low || hi >= state.low + state.count) {
-    let low = Math.floor(lo / 12) * 12, count = state.count;
-    while (hi >= low + count && count < 37) count = count === 13 ? 25 : 37;
-    releaseAll(); state.count = count; state.low = Math.max(24, Math.min(low, 108 - count)); layout(); refreshUI();
-  }
-  demo = { ev, start: now() + 0.6, i: 0, end: t + 1 }; ensureAudio(); firstTouch();
-  $('tuneBtn').textContent = '■ Stop: ' + tune.name;
+let demo = null, tuneIdx = -1, rec = null;
+function fitRange(lo, hi) {
+  if (lo >= state.low && hi < state.low + state.count) return;
+  let low = Math.floor(lo / 12) * 12, count = state.count;
+  while (hi >= low + count && count < 37) count = count === 13 ? 25 : 37;
+  releaseAll(); state.count = count; state.low = Math.max(24, Math.min(low, 108 - count)); layout(); refreshUI();
 }
-function stopTune() {
+function startPlayback(ev, end, btn, label) {
+  stopPlayback();
+  let lo = 999, hi = -999; for (const e of ev) { lo = Math.min(lo, e.n); hi = Math.max(hi, e.n); }
+  fitRange(lo, hi);
+  demo = { ev, start: now() + 0.5, end: end + 0.8, btn, label: btn.textContent };
+  btn.textContent = '■ Stop: ' + label; btn.classList.add('on');
+  ensureAudio(); firstTouch();
+}
+function stopPlayback() {
   if (!demo) return;
   for (const k of keys) release(k, 'demo');
-  demo = null; $('tuneBtn').textContent = '♪ Play a tune';
+  demo.btn.textContent = demo.label; demo.btn.classList.remove('on'); demo = null;
+}
+function stopTune() { stopPlayback(); }
+function startTune() {
+  tuneIdx = (tuneIdx + 1) % TUNES.length;
+  const tune = TUNES[tuneIdx], beat = 60 / tune.bpm; const ev = []; let t = 0;
+  for (const tok of tune.notes.trim().split(/\s+/)) { const [n, d = '1'] = tok.split(':'); const dur = +d * beat;
+    ev.push({ n: +n, on: t, off: t + Math.min(dur * 0.85, dur - 0.06) }); t += dur; }
+  startPlayback(ev, t, $('tuneBtn'), tune.name);
 }
 function demoTick(t) {
+  if (rec) { $('recBtn').textContent = '■ Stop ' + fmt(t - rec.start); if (t - rec.start > 300) stopRecording(); }
   if (!demo) return;
   const el = t - demo.start;
   for (const e of demo.ev) {
     if (!e.started && el >= e.on) { e.started = true; const k = keys[e.n - state.low]; if (k) press(k, 'demo'); }
     if (e.started && !e.done && el >= e.off) { e.done = true; const k = keys[e.n - state.low]; if (k) release(k, 'demo'); }
   }
-  if (el > demo.end) stopTune();
+  if (el > demo.end) stopPlayback();
 }
-$('tuneBtn').onclick = () => demo ? stopTune() : startTune();
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+// ---------- recording ----------
+let recordings = [];
+try { recordings = JSON.parse(localStorage.getItem('glowPianoRecs') || '[]'); } catch (e) {}
+function saveRecs() { try { localStorage.setItem('glowPianoRecs', JSON.stringify(recordings)); } catch (e) { alert('No room left to save recordings. Delete some old ones first.'); } }
+function startRecording() {
+  ensureAudio(); firstTouch();
+  rec = { start: now(), events: [], voice: state.voice };
+  $('recBtn').classList.add('rec'); $('recBtn').textContent = '■ Stop 0:00';
+}
+function stopRecording() {
+  if (!rec) return;
+  const r = rec; rec = null;
+  $('recBtn').classList.remove('rec'); $('recBtn').textContent = '● Record';
+  for (const k of keys) if (k.held) r.events.push([+(now() - r.start).toFixed(3), k.n, 0]);
+  if (!r.events.length) return;
+  const n = recordings.reduce((m, x) => Math.max(m, x.num || 0), 0) + 1;
+  recordings.push({ num: n, name: 'Recording ' + n, date: new Date().toLocaleDateString(), voice: r.voice, length: r.events[r.events.length - 1][0], events: r.events });
+  saveRecs(); refreshRecUI();
+}
+function toEvents(r) {
+  const ev = [], open = new Map();
+  for (const [t, n, on] of r.events) {
+    if (on) { const e = { n, on: t, off: t + 30 }; open.set(n, e); ev.push(e); }
+    else { const e = open.get(n); if (e) { e.off = Math.max(e.on + 0.05, t); open.delete(n); } }
+  }
+  return ev;
+}
+function playRecording(r, btn) {
+  if (rec) stopRecording();
+  if (VOICES[r.voice]) { state.voice = r.voice; refreshUI(); }
+  startPlayback(toEvents(r), r.length, btn || $('playBtn'), r.name);
+}
+function refreshRecUI() {
+  const has = recordings.length > 0;
+  $('playBtn').style.display = has ? '' : 'none';
+  $('listBtn').style.display = has ? '' : 'none';
+  $('listBtn').querySelector('.v').textContent = recordings.length;
+  const box = $('list').querySelector('.rows');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!has) { box.innerHTML = '<p class="empty">Nothing recorded yet. Tap ● Record, play something, then tap ■ Stop.</p>'; return; }
+  [...recordings].reverse().forEach(r => {
+    const row = document.createElement('div'); row.className = 'row';
+    const name = document.createElement('span'); name.className = 'name'; name.textContent = r.name; name.title = 'Tap to rename';
+    name.onclick = () => { const v = prompt('Name this recording', r.name); if (v && v.trim()) { r.name = v.trim().slice(0, 40); saveRecs(); refreshRecUI(); } };
+    const len = document.createElement('span'); len.className = 'len'; len.textContent = fmt(r.length) + ' · ' + r.date;
+    const play = document.createElement('button'); play.textContent = '▶';
+    play.onclick = () => { $('list').classList.remove('show'); playRecording(r); };
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
+    del.onclick = () => {
+      if (!del.classList.contains('sure')) { del.classList.add('sure'); del.textContent = 'Sure?'; setTimeout(() => { del.classList.remove('sure'); del.textContent = '✕'; }, 2500); return; }
+      recordings = recordings.filter(x => x !== r); saveRecs(); refreshRecUI();
+    };
+    row.append(name, len, play, del); box.appendChild(row);
+  });
+}
+$('list').innerHTML = '<div class="card"><h2>My recordings</h2><div class="rows"></div><p style="margin-top:14px"><button id="listClose">Close</button></p></div>';
+$('listClose').onclick = () => $('list').classList.remove('show');
+$('list').addEventListener('click', e => { if (e.target === $('list')) $('list').classList.remove('show'); });
+$('listBtn').onclick = () => { refreshRecUI(); $('list').classList.add('show'); };
+$('recBtn').onclick = () => rec ? stopRecording() : startRecording();
+$('playBtn').onclick = () => demo && demo.btn === $('playBtn') ? stopPlayback() : (recordings.length && playRecording(recordings[recordings.length - 1]));
+refreshRecUI();
+$('tuneBtn').onclick = () => demo && demo.btn === $('tuneBtn') ? stopPlayback() : startTune();
 
 // ---------- go ----------
 window.addEventListener('resize', resize);
