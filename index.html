@@ -123,12 +123,16 @@ function resize() {
 function layout() {
   kbH = Math.min(250, Math.max(110, H * 0.27));
   kbTop = H - kbH;
+  const old = new Map(keys.map(k => [k.n, k]));
   keys = [];
   let whites = 0;
   for (let i = 0; i < state.count; i++) {
     const n = state.low + i, pc = n % 12, black = BLACK.has(pc);
     if (!black) whites++;
-    keys.push({ n, i, pc, black, held: 0 });
+    const k = { n, i, pc, black, held: 0 };
+    const o = old.get(n);
+    if (o && o.i === i) { k.held = o.held; k.srcs = o.srcs; k.bar = o.bar; if (k.bar) k.bar.k = k; }
+    keys.push(k);
   }
   const ww = W / whites, bw = ww * 0.58, bh = kbH * 0.62;
   let x = 0;
