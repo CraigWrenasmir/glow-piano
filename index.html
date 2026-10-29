@@ -93,7 +93,7 @@
       <li><b>Colours</b> changes the glow. <i>Notes</i> gives every note name its own colour.</li>
       <li><b>Sound</b> picks the instrument. <b>Sustain</b> lets notes ring on after you let go.</li>
       <li><b>Letters</b> shows note names on the keys. <b>Sparkle</b> sets how many particles fly.</li>
-      <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording, and <b>My recordings</b> keeps them all. Tap a name to rename it.</li>
+      <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>My recordings</b> keeps them all. Tap a name to rename it.</li>
       <li><b>▲</b> hides the toolbar so the whole screen is piano. Tap <b>▼ menu</b> to bring it back.</li>
     </ul>
     <p><b>On an iPad:</b> in Safari tap the Share button, then <b>Add to Home Screen</b>. It then opens full screen like an app.</p>
@@ -277,8 +277,7 @@ function press(k, src) {
   if (k.held === 0) {
     if (rec) rec.events.push([+(now() - rec.start).toFixed(3), k.n, 1]);
     noteOn(k);
-    k.bar = { k, t0: now(), t1: null, col: k.col };
-    bars.push(k.bar);
+    if (src !== 'demo') { k.bar = { k, t0: now(), t1: null, col: k.col }; bars.push(k.bar); }
     burst(k, 14);
   }
   k.held++; k.srcs = k.srcs || new Set(); k.srcs.add(src);
@@ -319,7 +318,7 @@ function frame() {
     ctx.fillStyle = g; ctx.fillRect(k.x - (k.black ? 0 : 1), kbTop - 260, k.w + (k.black ? 0 : 2), 260);
   }
   // note bars
-  const v = Math.max(140, H * 0.34);
+  const v = speed();
   for (let i = bars.length - 1; i >= 0; i--) {
     const b = bars[i];
     const top = kbTop - (t - b.t0) * v;
@@ -328,6 +327,17 @@ function frame() {
     const hgt = Math.max(6, bottom - top);
     const fade = Math.max(0, Math.min(1, bottom / (H * 0.55)));
     drawBar(b.k, Math.max(top, -200), hgt, b.col, fade, b.t1 == null);
+  }
+  // falling bars: played-back notes land on the keys at the moment they sound
+  if (demo) {
+    const el = t - demo.start;
+    for (const e of demo.ev) {
+      const k = keys[e.n - state.low]; if (!k) continue;
+      const bottom = kbTop - (e.on - el) * v, top = kbTop - (e.off - el) * v;
+      if (top >= kbTop || bottom <= 0) continue;
+      const hit = el >= e.on;
+      drawBar(k, Math.max(top, -200), Math.min(bottom, kbTop) - Math.max(top, -200), k.col, hit ? 1 : 0.85, hit);
+    }
   }
   // particles
   ctx.globalCompositeOperation = 'lighter';
@@ -344,6 +354,7 @@ function frame() {
   drawKeyboard();
   requestAnimationFrame(frame);
 }
+const speed = () => Math.max(140, H * 0.34);
 function rr(x, y, w, h, r) {
   r = Math.min(r, w / 2, h / 2);
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -483,7 +494,8 @@ function startPlayback(ev, end, btn, label) {
   stopPlayback();
   let lo = 999, hi = -999; for (const e of ev) { lo = Math.min(lo, e.n); hi = Math.max(hi, e.n); }
   fitRange(lo, hi);
-  demo = { ev, start: now() + 0.5, end: end + 0.8, btn, label: btn.textContent };
+  const lead = kbTop / speed() + 0.2;
+  demo = { ev, start: now() + lead, end: end + 0.8, btn, label: btn.textContent };
   btn.textContent = '■ Stop: ' + label; btn.classList.add('on');
   ensureAudio(); firstTouch();
 }
