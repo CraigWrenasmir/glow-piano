@@ -120,6 +120,7 @@
   <div class="row"><div class="lab">Keys</div><div class="chips" id="keysChips"></div></div>
   <div class="row"><div class="lab">Colours</div><div class="chips" id="themeChips"></div></div>
   <div class="row"><div class="lab">Background</div><div class="chips" id="bgChips"></div></div>
+  <div class="row"><div class="lab">Hands</div><div class="chips" id="handChips"></div></div>
   <div class="row"><div class="lab">Effect</div><div class="chips" id="fxChips"></div></div>
   <div class="row"><div class="lab">Sparkle</div><div class="chips" id="sparkChips"></div></div>
   <div class="row"><div class="lab">Sound</div><div class="chips" id="voiceChips"></div></div>
@@ -142,6 +143,7 @@
       <li><b>⚙ Settings</b> has everything else: how many octaves, the colours, the background scene, the particle effect and how much sparkle, the instrument sound, sustain and the letters on the keys.</li>
       <li><b>♪ Tune</b> plays a built-in tune with the notes falling onto the keys. Tap again for the next tune.</li>
       <li><b>🎬</b> in the 🎞 recordings list turns a recording into a video with sound. It replays in real time, so keep the screen open, then tap <b>Save video</b> to save it to Photos or Files.</li>
+      <li><b>🖐 Hands</b> in Settings puts a pair of hands on the keys that play along with you, and with recordings. Pick gloves to suit, or let them match the scene.</li>
       <li><b>● Record</b> captures everything you play. <b>▶ Play back</b> plays the last recording with the notes falling onto the keys, and <b>🎞</b> lists them all. Tap a name to rename it.</li>
       <li><b>▲</b> hides the toolbar so the whole screen is piano. Tap <b>▼ menu</b> to bring it back.</li>
     </ul>
@@ -166,7 +168,8 @@ const SPARK = ['Off', 'Some', 'Lots'];
 const KEYCOUNTS = [13, 25, 37, 49];
 const OLD_THEMES = ['Rainbow', 'Notes', 'Ocean', 'Sunset', 'Classic'], OLD_VOICES = ['Piano', 'Soft', 'Bells', 'Retro'];
 const BGS = ['Plain', 'Night sky', 'Space', 'Underwater', 'Backrooms', 'Northern lights', 'Retro grid'];
-const state = { low: 48, count: 25, theme: 'Rainbow', voice: 'Piano', fx: 'Sparks', bg: 'Plain', sustain: false, labels: true, spark: 1 };
+const HANDS = ['Off', 'Match scene', 'Skin', 'Hazmat', 'Astronaut', 'Diver', 'Woolly', 'Aurora', 'Neon'];
+const state = { low: 48, count: 25, theme: 'Rainbow', voice: 'Piano', fx: 'Sparks', bg: 'Plain', hands: 'Off', sustain: false, labels: true, spark: 1 };
 try { Object.assign(state, JSON.parse(localStorage.getItem('glowPiano') || '{}')); } catch (e) {}
 if (typeof state.theme === 'number') state.theme = OLD_THEMES[state.theme] || 'Rainbow';
 if (typeof state.voice === 'number') state.voice = OLD_VOICES[state.voice] || 'Piano';
@@ -174,6 +177,7 @@ if (!THEMES.includes(state.theme)) state.theme = 'Rainbow';
 if (!VOICES.includes(state.voice)) state.voice = 'Piano';
 if (!FX.includes(state.fx)) state.fx = 'Sparks';
 if (!BGS.includes(state.bg)) state.bg = 'Plain';
+if (!HANDS.includes(state.hands)) state.hands = 'Off';
 state.low = Math.round(state.low / 12) * 12;
 if (!KEYCOUNTS.includes(state.count)) state.count = 25;
 function save() { try { localStorage.setItem('glowPiano', JSON.stringify(state)); } catch (e) {} }
@@ -218,6 +222,8 @@ function layout() {
     else { k.bx = k.x + k.w * 0.12; k.bw = k.w * 0.76; }
     k.col = colourFor(k);
   }
+  handU = Math.min(ww * 0.75, kbH * 0.26);
+  handsLayout();
 }
 function colourFor(k, theme = state.theme, N = keys.length) {
   const t = k.i / Math.max(1, N - 1);
@@ -372,7 +378,7 @@ function sprite(c, kind = 'glow') {
 function press(k, src, at = now()) {
   if (k.held === 0) {
     if (rec) rec.events.push([+(at - rec.start).toFixed(3), k.n, 1]);
-    noteOn(k); bgHit(k);
+    noteOn(k); bgHit(k); handsOn(k);
     if (src !== 'demo') { k.bar = { k, t0: at, t1: null, col: k.col }; bars.push(k.bar); }
     burst(k, 14);
   }
@@ -381,7 +387,7 @@ function press(k, src, at = now()) {
 function release(k, src, at = now()) {
   if (!k.srcs || !k.srcs.has(src)) return;
   k.srcs.delete(src); k.held = Math.max(0, k.held - 1);
-  if (k.held === 0) { if (rec) rec.events.push([+(at - rec.start).toFixed(3), k.n, 0]); noteOff(k); if (k.bar) { k.bar.t1 = at; k.bar = null; } burst(k, 8); }
+  if (k.held === 0) { if (rec) rec.events.push([+(at - rec.start).toFixed(3), k.n, 0]); noteOff(k); handsOff(k); if (k.bar) { k.bar.t1 = at; k.bar = null; } burst(k, 8); }
 }
 function releaseAll() { for (const k of keys) { if (k.held) { k.held = 1; k.srcs = new Set(['x']); release(k, 'x'); } } }
 const FX_RATE = { Sparks: [0, 1.6, 4], Fountain: [0, 2.2, 5], Fireworks: [0, 0.5, 1.4], Bubbles: [0, 0.35, 0.9], Confetti: [0, 0.9, 2.2], Stars: [0, 0.5, 1.3] };
@@ -618,6 +624,7 @@ function frame() {
   if (state.spark) { const rate = (FX_RATE[state.fx] || FX_RATE.Sparks)[state.spark];
     for (const k of keys) if (k.held) { const n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0); for (let j = 0; j < n; j++) spawn(k); } }
   drawKeyboard();
+  if (state.hands !== 'Off') drawHands(t, dt);
   requestAnimationFrame(frame);
 }
 const speed = () => Math.max(140, H * 0.34);
@@ -665,6 +672,187 @@ function drawKeyboard() {
     if (!k.held) { ctx.fillStyle = 'rgba(255,255,255,0.08)'; rr(k.x + 3, k.y, k.w - 6, k.h - 10, 3); ctx.fill(); }
     else { ctx.fillStyle = hsl(k.col, 92, 0.5); rr(k.x, k.y, k.w, 6, 3); ctx.fill(); }
   }
+}
+
+// ---------- hands ----------
+// Two hands seen from above, drawn in the piano's own canvas. Which hand and finger
+// takes a key follows the live rules of the Listening Field's Free Play page: the
+// hands move as little as they can and keep their fingers in order along the keys.
+// Everything is sized from handU, roughly the gap between two resting fingertips.
+const SCENE_HANDS = { Plain: 'Skin', 'Night sky': 'Woolly', Space: 'Astronaut', Underwater: 'Diver', Backrooms: 'Hazmat', 'Northern lights': 'Aurora', 'Retro grid': 'Neon' };
+const handSkin = () => state.hands === 'Match scene' ? SCENE_HANDS[state.bg] || 'Skin' : state.hands;
+// a right hand in hand units: x toward the little finger, y down the screen toward the player,
+// origin on the knuckle line under the middle finger. The left hand is the mirror image.
+const FINGER = {
+  1: { kx: -1.05, ky: 0.8, len: 1.6, rx: -2.05, ry: -0.05, w: 0.5, creases: [0.55] },
+  2: { kx: -0.8, ky: -0.1, len: 1.85, rx: -1.0, ry: -0.9, w: 0.4, creases: [0.42, 0.72] },
+  3: { kx: -0.27, ky: -0.2, len: 2.0, rx: -0.1, ry: -1.05, w: 0.4, creases: [0.42, 0.72] },
+  4: { kx: 0.27, ky: -0.14, len: 1.9, rx: 0.75, ry: -0.95, w: 0.38, creases: [0.42, 0.72] },
+  5: { kx: 0.78, ky: 0.02, len: 1.5, rx: 1.5, ry: -0.6, w: 0.33, creases: [0.42, 0.72] },
+};
+const SKINS = {
+  Skin: { top: '#f1c6a6', bot: '#d79a78', line: 'rgba(110,55,35,.55)', lw: 1.3, nail: 'rgba(255,238,230,.9)', crease: 'rgba(120,60,40,.28)' },
+  Hazmat: { top: '#f5d232', bot: '#d9ac0e', line: '#8a6c00', lw: 1.6, crease: 'rgba(110,80,0,.35)', seam: 'rgba(255,255,255,.25)', gloss: 'rgba(255,255,255,.4)', cuff: { col: '#caa00c', band: '#454545', ribbed: true } },
+  Astronaut: { top: '#fbfbfd', bot: '#d4d7e2', line: '#8c92a8', lw: 1.5, crease: 'rgba(90,100,130,.45)', seam: '#b8bdcd', pad: '#5a5e6e', cuff: { col: '#2a58d8', band: '#a4abbf' } },
+  Diver: { top: '#2b3445', bot: '#121722', line: '#04070e', lw: 1.5, crease: 'rgba(0,0,0,.35)', seam: '#25d4ff', web: 'rgba(37,212,255,.35)', cuff: { col: '#25d4ff', band: '#0a2730' } },
+  Woolly: { top: '#3d509e', bot: '#27356f', line: '#1a2452', lw: 1.5, crease: 'rgba(0,0,0,.18)', knit: 'rgba(255,255,255,.14)', specks: 'rgba(255,255,255,.55)', cuff: { col: '#4b60b3', band: '#2b3978', ribbed: true } },
+  Aurora: { top: 'rgba(130,255,205,.42)', bot: 'rgba(175,115,255,.42)', line: 'rgba(255,255,255,.8)', lw: 1.4, glow: 'rgba(120,255,220,.9)', glass: true, crease: 'rgba(255,255,255,.25)' },
+  Neon: { top: 'rgba(25,0,45,.65)', bot: 'rgba(45,0,70,.65)', line: '#ff2bd6', lw: 2.2, glow: '#ff2bd6', seam: '#22e5ff', crease: '#22e5ff', glass: true },
+};
+let handU = 40;
+function newHand(h) { return { h, sx: h === 'R' ? 1 : -1, x: 0, tx: 0, yo: 0, tyo: 0, fingers: [null, null, null, null, null, null], tips: [], placed: false, slide: null }; }
+const hands = { L: newHand('L'), R: newHand('R'), held: new Map() };
+const whitePlayY = () => kbTop + kbH * 0.5;
+const handY0 = () => whitePlayY() + 1.05 * handU; // the knuckle line when the middle finger rests on a white key
+function contact(n) {
+  const k = keys[n - state.low]; if (!k) return null;
+  return { k, x: k.x + k.w / 2, y: k.black ? kbTop + k.h * 0.5 : whitePlayY() };
+}
+function placeHands() { hands.L.x = hands.L.tx = W * 0.3; hands.R.x = hands.R.tx = W * 0.7; hands.L.placed = hands.R.placed = true; }
+function handsLayout() {
+  for (const [n, h] of [...hands.held]) if (!contact(n)) { h.hand.fingers[h.f] = null; hands.held.delete(n); }
+  for (const hand of [hands.L, hands.R]) { hand.x = Math.max(0, Math.min(W, hand.x)); hand.tx = Math.max(0, Math.min(W, hand.tx)); }
+}
+function bestFinger(hand, n) {
+  const c = contact(n); let best = null;
+  for (let f = 1; f <= 5; f++) {
+    const g = FINGER[f], wx = c.x - hand.sx * g.rx * handU; // where the hand would sit for this finger to take the key
+    let cost = Math.abs(wx - hand.x) / handU + (hand.fingers[f] ? 3.4 : 0);
+    for (let o = 1; o <= 5; o++) {
+      const m = hand.fingers[o]; if (!m || o === f) continue; const oc = contact(m); if (!oc) continue;
+      const stretch = Math.abs((oc.x - wx) * hand.sx / handU - FINGER[o].rx); if (stretch > 0.85) cost += (stretch - 0.85) * 3;
+      if (((oc.x - c.x) * hand.sx > 0) !== (o > f)) cost += 2.5; // keep the fingers in order along the keys
+    }
+    // a finger that just left the next key over keeps sliding, as in a glissando
+    if (hand.slide && hand.slide.f === f && Math.abs(hand.slide.n - n) <= 2 && now() - hand.slide.t < 0.12) cost -= 3;
+    if (!best || cost < best.cost) best = { f, wx, cost };
+  }
+  return best;
+}
+function handsOn(k) {
+  if (state.hands === 'Off') return;
+  const n = k.n; if (hands.held.has(n)) return; const c = contact(n); if (!c) return;
+  const L = hands.L, R = hands.R; if (!L.placed) placeHands();
+  const bl = bestFinger(L, n), br = bestFinger(R, n), mid = W / 2;
+  const cl = bl.cost + (c.x > mid ? 1.3 : 0) + (c.x > R.x + 0.85 * handU ? 10 : 0);
+  const cr = br.cost + (c.x < mid ? 1.3 : 0) + (c.x < L.x - 0.85 * handU ? 10 : 0);
+  const hand = cl <= cr ? L : R, b = cl <= cr ? bl : br;
+  if (hand.fingers[b.f]) { const old = hands.held.get(hand.fingers[b.f]); if (old) hands.held.delete(hand.fingers[b.f]); }
+  hand.fingers[b.f] = n; hands.held.set(n, { hand, f: b.f });
+  retarget(hand);
+}
+function handsOff(k) {
+  const h = hands.held.get(k.n); if (!h) return;
+  if (h.hand.fingers[h.f] === k.n) h.hand.fingers[h.f] = null;
+  h.hand.slide = { f: h.f, n: k.n, t: now() };
+  hands.held.delete(k.n); retarget(h.hand);
+}
+function retarget(hand) {
+  let n = 0, sx = 0, sy = 0;
+  for (let f = 1; f <= 5; f++) {
+    const m = hand.fingers[f]; if (!m) continue; const c = contact(m); if (!c) continue;
+    n++; sx += c.x - hand.sx * FINGER[f].rx * handU; sy += c.y - FINGER[f].ry * handU;
+  }
+  if (n) { hand.tx = sx / n; hand.tyo = Math.max(-1.0 * handU, Math.min(0.15 * handU, sy / n - handY0())); }
+}
+function capsule(p, x0, y0, x1, y1, r0, r1) {
+  const a = Math.atan2(y1 - y0, x1 - x0);
+  p.moveTo(x0 + Math.cos(a + Math.PI / 2) * r0, y0 + Math.sin(a + Math.PI / 2) * r0);
+  p.arc(x0, y0, r0, a + Math.PI / 2, a + 3 * Math.PI / 2, false);
+  p.arc(x1, y1, r1, a - Math.PI / 2, a + Math.PI / 2, false);
+  p.closePath();
+}
+function poly(p, pts, sx) {
+  const list = sx < 0 ? [...pts].reverse() : pts; // keep every shape wound the same way so the union fills cleanly
+  p.moveTo(list[0][0], list[0][1]); for (let i = 1; i < list.length; i++) p.lineTo(list[i][0], list[i][1]); p.closePath();
+}
+function drawHands(t, dt) {
+  const skin = SKINS[handSkin()]; if (!skin) return;
+  const k = 1 - Math.exp(-dt / 0.045);
+  for (const hand of [hands.L, hands.R]) {
+    if (!hand.placed) placeHands();
+    hand.x += (hand.tx - hand.x) * k; hand.yo += (hand.tyo - hand.yo) * k;
+    const ox = hand.x, oy = handY0() + hand.yo + Math.sin(t * 1.3 + (hand.sx > 0 ? 0 : 2)) * 1.2;
+    for (let f = 1; f <= 5; f++) {
+      const g = FINGER[f], m = hand.fingers[f], c = m && contact(m); let tx, ty;
+      if (c) { tx = c.x; ty = c.y + 2; } else { tx = ox + hand.sx * g.rx * handU; ty = oy + g.ry * handU + Math.sin(t * 1.7 + f * 1.3) * 0.8; }
+      const tip = hand.tips[f] || (hand.tips[f] = { x: tx, y: ty });
+      const kk = 1 - Math.exp(-dt / (c ? 0.035 : 0.09)); tip.x += (tx - tip.x) * kk; tip.y += (ty - tip.y) * kk; tip.down = !!c;
+    }
+    renderHand(hand, ox, oy, skin, t);
+  }
+}
+function renderHand(hand, ox, oy, skin, t) {
+  const u = handU, sx = hand.sx;
+  const P = (x, y) => [ox + sx * x * u, oy + y * u];
+  const kn = [2, 3, 4, 5].map(f => P(FINGER[f].kx, FINGER[f].ky));
+  const palm = [P(-1.08, 0.05), kn[0], kn[1], kn[2], kn[3], P(1.1, 0.3), P(1.02, 1.0), P(0.86, 1.6), P(-0.8, 1.6), P(-1.02, 1.1), P(-1.3, 0.75), P(-1.18, 0.35)];
+  const arm = [P(-0.8, 1.5), P(0.86, 1.5), P(0.78, 4.0), P(-0.72, 4.0)];
+  const fingerPath = f => {
+    const g = FINGER[f], K = P(g.kx, g.ky), T = hand.tips[f], r0 = g.w * u * 0.5;
+    const p = new Path2D(); capsule(p, K[0], K[1], T.x, T.y, r0, r0 * 0.86); return p;
+  };
+  const paths = {}; for (let f = 1; f <= 5; f++) paths[f] = fingerPath(f);
+  const union = new Path2D(); poly(union, palm, sx); poly(union, arm, sx); for (let f = 1; f <= 5; f++) union.addPath(paths[f]);
+  const grad = ctx.createLinearGradient(0, oy - 2 * u, 0, oy + 2.6 * u); grad.addColorStop(0, skin.top); grad.addColorStop(1, skin.bot);
+  ctx.save();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // shadow on the keys
+  if (!skin.glass) {
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetX = 3 * sx; ctx.shadowOffsetY = 12;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fill(union); ctx.restore();
+  }
+  if (skin.glow) { ctx.shadowColor = skin.glow; ctx.shadowBlur = 14; }
+  ctx.fillStyle = grad; ctx.strokeStyle = skin.line; ctx.lineWidth = skin.lw;
+  const shape = (p, fill = true) => { if (fill) ctx.fill(p); ctx.stroke(p); };
+  // forearm, palm, webbing, then the fingers (thumb first so the index lies over it)
+  const armP = new Path2D(); poly(armP, arm, sx); shape(armP);
+  const palmP = new Path2D(); poly(palmP, palm, sx);
+  const fingerDetail = f => {
+    const g = FINGER[f], K = P(g.kx, g.ky), T = hand.tips[f], r0 = g.w * u * 0.5, r1 = r0 * 0.86;
+    const dx = T.x - K[0], dy = T.y - K[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, a = Math.atan2(dy, dx);
+    const ext = Math.min(1, d / (g.len * u)); // how far the finger is stretched out; curled fingers show deeper creases
+    shape(paths[f]);
+    ctx.save(); ctx.shadowBlur = 0;
+    if (skin.seam) { ctx.strokeStyle = skin.seam; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(K[0] + ux * r0 * 0.3, K[1] + uy * r0 * 0.3); ctx.lineTo(T.x - ux * r1 * 0.6, T.y - uy * r1 * 0.6); ctx.stroke(); }
+    if (skin.gloss) { ctx.strokeStyle = skin.gloss; ctx.lineWidth = r0 * 0.42; ctx.beginPath(); ctx.moveTo(K[0] + ux * r0 - uy * r0 * 0.45 * sx, K[1] + uy * r0 + ux * r0 * 0.45 * sx); ctx.lineTo(T.x - ux * r1 * 1.2 - uy * r0 * 0.45 * sx, T.y - uy * r1 * 1.2 + ux * r0 * 0.45 * sx); ctx.stroke(); }
+    if (skin.knit) { ctx.strokeStyle = skin.knit; ctx.lineWidth = 1.2; ctx.beginPath(); const step = 0.2 * u; for (let s = r0; s < d - r1; s += step) { const cx = K[0] + ux * s, cy = K[1] + uy * s, w = r0 * (0.55 + 0.2 * Math.sin(s * 7)); ctx.moveTo(cx - uy * w, cy + ux * w); ctx.lineTo(cx + uy * w, cy - ux * w); } ctx.stroke(); }
+    if (skin.crease) {
+      ctx.strokeStyle = skin.crease; ctx.lineWidth = 1 + (1 - ext) * 1.6; ctx.beginPath();
+      for (const c of g.creases) { const cx = K[0] + ux * d * c, cy = K[1] + uy * d * c, w = r0 * 0.7; ctx.moveTo(cx - uy * w, cy + ux * w); ctx.quadraticCurveTo(cx + ux * r0 * 0.25, cy + uy * r0 * 0.25, cx + uy * w, cy - ux * w); }
+      ctx.stroke();
+    }
+    if (skin.pad) { const p = new Path2D(); capsule(p, T.x - ux * d * 0.24, T.y - uy * d * 0.24, T.x, T.y, r1 * 0.98, r1 * 0.98); ctx.fillStyle = skin.pad; ctx.fill(p); }
+    if (skin.nail) { ctx.fillStyle = skin.nail; ctx.beginPath(); ctx.ellipse(T.x - ux * r1 * 0.75, T.y - uy * r1 * 0.75, r1 * 0.78, r1 * 0.58, a, 0, 7); ctx.fill(); ctx.strokeStyle = skin.line; ctx.lineWidth = 0.8; ctx.stroke(); }
+    if (skin.specks) { ctx.fillStyle = skin.specks; for (let i = 0; i < 3; i++) { const s = r0 + ((f * 37 + i * 53) % 100) / 100 * (d - 2 * r0), o = (((f * 11 + i * 29) % 100) / 100 - 0.5) * r0 * 1.2; ctx.beginPath(); ctx.arc(K[0] + ux * s - uy * o, K[1] + uy * s + ux * o, 1.1, 0, 7); ctx.fill(); } }
+    if (T.down && !skin.glass) { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(T.x + 2 * sx, T.y + 3, r1 * 1.1, r1 * 0.7, 0, 0, 7); ctx.fill(); }
+    ctx.restore();
+  };
+  // thumb first, then the palm over its root, then the webbing and the fingers
+  fingerDetail(1);
+  shape(palmP);
+  if (skin.web) {
+    ctx.save(); ctx.shadowBlur = 0; ctx.fillStyle = skin.web;
+    for (let f = 2; f <= 4; f++) {
+      const a = hand.tips[f], b = hand.tips[f + 1], A = P(FINGER[f].kx, FINGER[f].ky), B = P(FINGER[f + 1].kx, FINGER[f + 1].ky);
+      ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(A[0] + (a.x - A[0]) * 0.45, A[1] + (a.y - A[1]) * 0.45); ctx.lineTo(B[0] + (b.x - B[0]) * 0.45, B[1] + (b.y - B[1]) * 0.45); ctx.lineTo(B[0], B[1]); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  for (const f of [5, 4, 3, 2]) fingerDetail(f);
+  // knuckle creases and the glove cuff
+  ctx.save(); ctx.shadowBlur = 0;
+  if (skin.crease && !skin.glass) { ctx.strokeStyle = skin.crease; ctx.lineWidth = 1; ctx.beginPath(); for (const K of kn) { ctx.moveTo(K[0] - 0.14 * u, K[1] + 0.22 * u); ctx.quadraticCurveTo(K[0], K[1] + 0.1 * u, K[0] + 0.14 * u, K[1] + 0.22 * u); } ctx.stroke(); }
+  if (skin.cuff) {
+    const c = skin.cuff, cp = new Path2D(); poly(cp, [P(-0.82, 1.45), P(0.88, 1.45), P(0.85, 2.0), P(-0.8, 2.0)], sx);
+    ctx.fillStyle = c.col; ctx.fill(cp); ctx.strokeStyle = skin.line; ctx.lineWidth = skin.lw; ctx.stroke(cp);
+    ctx.strokeStyle = c.band; ctx.lineWidth = c.ribbed ? 1 : 3; ctx.beginPath();
+    if (c.ribbed) { for (let x = -0.7; x <= 0.75; x += 0.17) { const A = P(x, 1.49), B = P(x, 1.97); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); } }
+    else { const A = P(-0.8, 1.72), B = P(0.86, 1.72); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); }
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
 }
 
 // ---------- input ----------
@@ -753,10 +941,12 @@ chips($('themeChips'), THEMES, { swatch: themeSwatch, pick: v => { state.theme =
 chips($('fxChips'), FX, { icon: FX_ICON, pick: v => { state.fx = v; refreshUI(); } });
 const BG_ICON = { Plain: '⬛', 'Night sky': '🌙', Space: '🪐', Underwater: '🐠', Backrooms: '🚪', 'Northern lights': '🌌', 'Retro grid': '🌇' };
 chips($('bgChips'), BGS, { icon: BG_ICON, pick: v => { state.bg = v; shots = []; refreshUI(); } });
+const HAND_ICON = { Off: '✕', 'Match scene': '🎭', Skin: '✋', Hazmat: '🧤', Astronaut: '🧑‍🚀', Diver: '🤿', Woolly: '🧶', Aurora: '🌌', Neon: '🕹' };
+chips($('handChips'), HANDS, { icon: HAND_ICON, pick: v => { state.hands = v; refreshUI(); } });
 chips($('sparkChips'), [0, 1, 2], { label: v => SPARK[v], pick: v => { state.spark = v; refreshUI(); } });
 chips($('voiceChips'), VOICES, { icon: VOICE_ICON, pick: v => { state.voice = v; refreshUI(); } });
 function refreshUI() {
-  mark($('keysChips'), state.count); mark($('themeChips'), state.theme); mark($('bgChips'), state.bg); mark($('fxChips'), state.fx); mark($('sparkChips'), state.spark); mark($('voiceChips'), state.voice);
+  mark($('keysChips'), state.count); mark($('themeChips'), state.theme); mark($('bgChips'), state.bg); mark($('fxChips'), state.fx); mark($('sparkChips'), state.spark); mark($('voiceChips'), state.voice); mark($('handChips'), state.hands);
   $('sustainBtn').classList.toggle('on', state.sustain);
   $('labelsBtn').classList.toggle('on', state.labels);
   $('octDown').disabled = state.low <= 24; $('octUp').disabled = state.low + state.count > 96;

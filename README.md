@@ -5,6 +5,7 @@ A piano for the iPad (and any browser) with rising glowing note bars and particl
 - One, two or three octaves, shiftable up and down
 - Multi-touch, with glissando when you slide across the keys
 - Five colour themes, four instrument sounds, sustain, note letters
+- Optional hands on the keys that play along with you and with recordings, in skins that match the backgrounds (skin, hazmat, astronaut, diver, woolly, aurora, neon)
 - Built-in tunes to watch and play along with
 - Computer keyboard support for desktop play
 
